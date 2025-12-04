@@ -3,16 +3,18 @@ import React, { useState, useEffect } from 'react';
 import OrderItem from '../components/OrderItem';
 import { db } from '../firebase';
 import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  onSnapshot, 
-  runTransaction,
-  serverTimestamp,
-  deleteDoc
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  doc, 
+  updateDoc, 
+  onSnapshot, 
+  runTransaction,
+  serverTimestamp,
+  getDoc,
+  deleteDoc,
+  orderBy // <--- ADD THIS IMPORT
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2'; // For modern, better dialogs
@@ -20,6 +22,9 @@ import { Clock, Loader2, ClipboardList } from 'lucide-react';
 
 export default function OrderManagementPage() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('pending');
+  const [orderHistory, setOrderHistory] = useState([]); // NEW STATE
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [restaurantId, setRestaurantId] = useState(null);
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,101 +78,86 @@ export default function OrderManagementPage() {
 
     // This is the real-time listener, equivalent to addSnapshotListener
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      let fetchedOrders = [];
-      for (const docSnap of querySnapshot.docs) {
-        let order = { id: docSnap.id, ...docSnap.data(), orderId: docSnap.id };
-        // Fetch restaurant details for each order (similar to your Java logic)
-        try {
-          const resDoc = await getDocs(query(
-            collection(db, "FoodPlaces"), 
-            where("name", "==", order.restaurantName) // Assuming restaurantName is available in order doc
-          ));
-          if (!resDoc.empty) {
-            order.restaurantName = resDoc.docs[0].data().name;
-          } else {
-            // Fallback: If restaurantName is not in the order doc, use the ID 
-            // and assume it's the current restaurant
-            if (order.restaurantId === restaurantId) {
-                order.restaurantName = "Your Restaurant";
-            } else {
-                order.restaurantName = "Unknown/Other Restaurant";
-            }
-          }
-        } catch (e) {
-            console.error("Error fetching restaurant details:", e);
-            order.restaurantName = "Error Loading Name";
-        }
-        fetchedOrders.push(order);
-      }
-      setOrders(fetchedOrders);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error loading orders:", error);
-      setError(`Error loading orders: ${error.message}`);
-      setIsLoading(false);
-    });
+      try {
+        // Use Promise.all to fetch all necessary details concurrently
+        const fetchedOrders = await Promise.all(
+          querySnapshot.docs.map(docSnap => fetchOrderData(docSnap))
+        );
+        setOrders(fetchedOrders);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error loading orders:", error);
+        setError(`Error loading orders: ${error.message}`);
+        setIsLoading(false);
+      }
+    });
 
-    // Clean up the listener when the component unmounts
-    return () => unsubscribe();
-  }, [restaurantId]);
+    // Clean up the listener when the component unmounts
+    return () => unsubscribe();
+  }, [restaurantId]);
   
   // --- 3. Order Actions ---
 
   // Equivalent to acceptOrder(String orderId)
   const acceptOrder = async (orderId) => {
-    const orderDocRef = doc(db, "orders", orderId);
+  const orderDocRef = doc(db, "orders", orderId);
+
+  try {
+    let totalPrepTimeMinutes = 0;
+
+    // STEP 1: Use transaction to atomically set status and server timestamp (startTime)
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(orderDocRef);
+
+      if (!snapshot.exists()) {
+        throw new Error("Order does not exist");
+      }
+
+      // Safe retrieval of totalPrepTime
+      totalPrepTimeMinutes = snapshot.data().totalPrepTime;
+      if (totalPrepTimeMinutes == null) {
+        throw new Error("Total prep time is missing or null");
+      }
+
+      // The transaction updates:
+      transaction.update(orderDocRef, {
+        approvalStatus: "accepted",
+        startTime: serverTimestamp(), // Sets the server timestamp
+      });
+      
+      return totalPrepTimeMinutes; // Return the prep time for the next step
+    });
+
+    // STEP 2: Wait for the transaction to complete, then read the document to get the confirmed 'startTime'.
+    // This replicates the Android success listener logic.
+    const updatedSnapshot = await getDoc(orderDocRef);
+    const startTimeTimestamp = updatedSnapshot.data()?.startTime;
     
-    try {
-      // Use Firestore Transaction for atomic update
-      const totalPrepTimeMinutes = await runTransaction(db, async (transaction) => {
-        const snapshot = await transaction.get(orderDocRef);
-        
-        if (!snapshot.exists()) {
-          throw new Error("Order does not exist");
-        }
-        
-        const totalPrepTimeMinutes = snapshot.data().totalPrepTime;
-        if (totalPrepTimeMinutes == null) {
-          throw new Error("Total prep time is missing");
-        }
-        
-        transaction.update(orderDocRef, {
-          approvalStatus: "accepted",
-          startTime: serverTimestamp(),
-        });
-        
-        return totalPrepTimeMinutes;
+    if (startTimeTimestamp) {
+      // Calculate endTime based on the confirmed startTime
+      const startTimeMs = startTimeTimestamp.toMillis();
+      const totalPrepTimeMs = totalPrepTimeMinutes * 60 * 1000; // Convert minutes to milliseconds
+      const endTimeMs = startTimeMs + totalPrepTimeMs;
+
+      // STEP 3: Perform the final update to set endTime
+      await updateDoc(orderDocRef, {
+        endTime: new Date(endTimeMs) // Firestore converts Date objects to Timestamps
       });
 
-      // After successful transaction, calculate and set endTime
-      // Note: We need a slight delay to ensure 'startTime' is set and readable
-      // In a more robust system, you might use a Cloud Function for this.
-      // For now, we fetch the updated doc immediately after the transaction.
-      const updatedSnapshot = await transaction.get(orderDocRef); // Re-fetch
-      const startTime = updatedSnapshot.data().startTime;
-        
-      if (startTime) {
-        // Calculate endTime in milliseconds, then convert to Firestore Timestamp (if needed)
-        // Since Firestore serverTimestamp is more reliable, we'll calculate the value
-        // based on the document's startTime. In web/JS, this is simpler:
-        const startTimeMs = startTime.toMillis();
-        const endTimeMs = startTimeMs + (totalPrepTimeMinutes * 60 * 1000); // Minutes to milliseconds
-        
-        // Update with the calculated end time
-        await updateDoc(orderDocRef, {
-          endTime: new Date(endTimeMs) // Firestore converts Date objects to Timestamps
-        });
-        
-        Swal.fire('Accepted!', 'Order has been successfully accepted.', 'success');
-      } else {
-        throw new Error("Failed to retrieve server start time.");
-      }
+      // Show success message
+      Swal.fire('Accepted!', `Order #${orderId.substring(0, 8)} accepted. End time calculated.`, 'success');
       
-    } catch (e) {
-      console.error("Failed to accept order:", e);
-      Swal.fire('Error', `Failed to accept order: ${e.message}`, 'error');
+    } else {
+      // If startTime is unexpectedly null after transaction, log an error
+      throw new Error("Server start time was null after transaction success.");
     }
-  };
+
+  } catch (e) {
+    console.error("Failed to accept order:", e);
+    // Show error message
+    Swal.fire('Error', `Failed to accept order. Check console for details.`, 'error');
+  }
+};
 
   // Equivalent to declineOrder(String orderId) and updateOrderDeclineStatus(...)
   const declineOrder = async (orderId) => {
@@ -237,7 +227,69 @@ export default function OrderManagementPage() {
       }
     }
   };
-  
+  const fetchOrderData = async (docSnap) => {
+    let order = { id: docSnap.id, ...docSnap.data(), orderId: docSnap.id };
+    
+    // Fetch Customer Details
+    const customerId = order.userId;
+    if (customerId) {
+        try {
+            const customerDoc = await getDoc(doc(db, "users", customerId));
+            if (customerDoc.exists()) {
+                const customerData = customerDoc.data();
+                order.customerName = customerData.name || "Unknown Customer";
+                order.customerPhone = customerData.phone || "N/A";
+                order.customerEmail = customerData.email || "N/A";
+            }
+        } catch (e) {
+            console.error("Error fetching customer details:", e);
+        }
+    }
+    
+    // Fetch Restaurant Location/Name (For completeness, though generally known in this view)
+    if (order.restaurantId) {
+        try {
+            const resDoc = await getDoc(doc(db, "FoodPlaces", order.restaurantId));
+            if (resDoc.exists()) {
+                const resData = resDoc.data();
+                order.restaurantName = resData.name || "N/A";
+                order.restaurantAddress = resData.address || "Location Not Set";
+            }
+        } catch (e) {
+            console.error("Error fetching restaurant details:", e);
+        }
+    }
+    
+    return order;
+};
+
+
+const loadOrderHistory = async () => {
+    if (!restaurantId || historyLoading) return;
+    setHistoryLoading(true);
+
+    const q = query(
+        collection(db, "orders"),
+        where("restaurantId", "==", restaurantId),
+        // Filter for orders that are no longer pending
+        where("approvalStatus", "in", ["accepted", "declined"]), 
+        orderBy("startTime", "desc") // Show most recent history first
+    );
+
+    try {
+        const querySnapshot = await getDocs(q);
+        const historyOrders = await Promise.all(
+            querySnapshot.docs.map(docSnap => fetchOrderData(docSnap))
+        );
+        setOrderHistory(historyOrders);
+
+    } catch (error) {
+        console.error("Error loading order history:", error);
+        Swal.fire('Error', 'Failed to load order history.', 'error');
+    } finally {
+        setHistoryLoading(false);
+    }
+};
   // --- Render Logic ---
   if (isLoading) {
     return (
@@ -260,45 +312,92 @@ export default function OrderManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative overflow-hidden pt-16">
-      {/* Background Image (Matching your XML) */}
-      <div 
-        className="absolute inset-0 opacity-20"
-        style={{
-          // Use a dummy image URL for the web version, replace with your actual asset
-          backgroundImage: 'url(/background4.jpg)', 
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }}
-      />
-      <div className="relative z-10 p-6 max-w-4xl mx-auto">
-        {/* Header (Matching your TextView) */}
-        <div className="text-center mb-8 mt-4">
-          <h1 className="text-4xl font-bold text-gray-800 drop-shadow-sm">
-            <ClipboardList className="inline w-10 h-10 mr-2 text-orange-600" />
-            Order Management
-          </h1>
+    <div className="min-h-screen bg-gray-50 relative overflow-hidden pt-16">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage: 'url(/background4.jpg)', 
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      />
+      <div className="relative z-10 p-6 max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8 mt-4">
+          <h1 className="text-4xl font-bold text-gray-800 drop-shadow-sm">
+            <ClipboardList className="inline w-10 h-10 mr-2 text-orange-600" />
+            Order Management
+          </h1>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex justify-center mb-6 bg-white p-2 rounded-xl shadow-md">
+            <button
+                onClick={() => setActiveTab('pending')}
+                className={`px-8 py-3 text-lg font-bold rounded-l-lg transition-colors ${
+                    activeTab === 'pending' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+            >
+                Pending Orders ({orders.length})
+            </button>
+            <button
+                onClick={() => { setActiveTab('history'); loadOrderHistory(); }} // Trigger load on switch
+                className={`px-8 py-3 text-lg font-bold rounded-r-lg transition-colors ${
+                    activeTab === 'history' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+            >
+                Order History ({orderHistory.length})
+            </button>
         </div>
         
-        {/* RecyclerView Equivalent */}
-        <div className="space-y-4">
-          {orders.length === 0 ? (
-            <div className="text-center mt-20 p-10 bg-white rounded-xl shadow-lg border-t-4 border-green-500">
-              <p className="text-3xl font-bold text-green-600 mb-2">🎉 No Pending Orders</p>
-              <p className="text-gray-600">You're all caught up!</p>
+        {/* Content based on Active Tab */}
+        {/* === PENDING TAB === */}
+        {activeTab === 'pending' && (
+            <div className="space-y-4">
+              {orders.length === 0 ? (
+                <div className="text-center mt-20 p-10 bg-white rounded-xl shadow-lg border-t-4 border-green-500">
+                  <p className="text-3xl font-bold text-green-600 mb-2">🎉 No Pending Orders</p>
+                  <p className="text-gray-600">You're all caught up!</p>
+                </div>
+              ) : (
+                orders.map((order) => (
+                  <OrderItem 
+                    key={order.id} 
+                    order={order} 
+                    onAccept={acceptOrder} 
+                    onDecline={declineOrder} 
+                  />
+                ))
+              )}
             </div>
-          ) : (
-            orders.map((order) => (
-              <OrderItem 
-                key={order.id} 
-                order={order} 
-                onAccept={acceptOrder} 
-                onDecline={declineOrder} 
-              />
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
+        )}
+
+        {/* === HISTORY TAB === */}
+        {activeTab === 'history' && (
+            <div className="space-y-4">
+                {historyLoading ? (
+                    <div className="text-center p-10 bg-white rounded-xl shadow-lg text-lg text-gray-500 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                        Loading History...
+                    </div>
+                ) : orderHistory.length > 0 ? (
+                    orderHistory.map(order => (
+                        <OrderItem 
+                            key={order.id} 
+                            order={order} 
+                            onAccept={null} // Pass null to hide action buttons
+                            onDecline={null} // Pass null to hide action buttons
+                        />
+                    ))
+                ) : (
+                    <div className="text-center p-10 bg-white rounded-xl shadow-lg text-lg text-gray-500">
+                        No previous orders found.
+                    </div>
+                )}
+            </div>
+        )}
+      </div>
+    </div>
+  );
 }
