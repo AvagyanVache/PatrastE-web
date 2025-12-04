@@ -1,143 +1,188 @@
-// src/components/MenuFormModal.jsx (Simplified structure)
+// src/components/MenuFormModal.jsx
 import React, { useState, useEffect } from 'react';
+import { X, Upload } from 'lucide-react';
 import { db, storage } from '../firebase';
-import { doc, getDoc, writeBatch } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
-export const MenuFormModal = ({ isOpen, onClose, itemToEdit, restaurantId, onSaveSuccess }) => {
-    // State to manage form inputs and the file selected for upload
-    const [form, setForm] = useState({});
-    const [imageFile, setImageFile] = useState(null);
+export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onSuccess }) {
+  const [form, setForm] = useState({
+    itemName: '', itemPrice: '', prepTime: '', itemDescription: '', isAvailable: true
+  });
+  const [imageFile, setImageFile] = useState(null);
+  const [preview, setPreview] = useState(item?.["Item Img"] || null);
 
-    // Populate form if editing
-    useEffect(() => {
-        if (itemToEdit) {
-            setForm({
-                itemName: itemToEdit.itemName,
-                itemPrice: itemToEdit.itemPrice,
-                prepTime: String(itemToEdit.prepTime),
-                itemDescription: itemToEdit.itemDescription,
-                isAvailable: itemToEdit.isAvailable,
-                originalDocumentId: itemToEdit.documentId,
-            });
-            setImageFile(null); // Clear file input on edit
-        } else {
-            // Reset form for new item
-            setForm({
-                itemName: '', itemPrice: '', prepTime: '', itemDescription: '', isAvailable: true, originalDocumentId: null
-            });
-            setImageFile(null);
-        }
-    }, [itemToEdit, isOpen]);
+  useEffect(() => {
+    if (item) {
+      setForm({
+        itemName: item["Item Name"] || '',
+        itemPrice: item["Item Price"] || '',
+        // FIX 3: Convert numeric Prep Time to String for React input value
+        prepTime: String(item["Prep Time"] || ''), 
+        itemDescription: item["Item Description"] || '',
+        isAvailable: item.Available ?? true
+      });
+      setPreview(item["Item Img"] || null);
+    } else {
+      setForm({ itemName: '', itemPrice: '', prepTime: '', itemDescription: '', isAvailable: true });
+      setPreview(null);
+    }
+    setImageFile(null);
+  }, [item, isOpen]);
 
-    const handleFileChange = (e) => {
-        // This is how you handle image selection on the web
-        setImageFile(e.target.files[0]);
-    };
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setPreview(URL.createObjectURL(file));
+    }
+  };
 
-    // Maps to addItem, updateItemInFirestore, uploadImageAndSaveItem, etc.
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const { itemName, itemPrice, prepTime, itemDescription, isAvailable, originalDocumentId } = form;
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  const safeId = restaurantId.replace(/\s+/g, '_');
 
-        if (!itemName || !itemPrice || !prepTime) {
-            alert("Name, price, and prep time are required");
-            return;
-        }
+  if (!form.itemName || !form.itemPrice || !form.prepTime) {
+    alert("Name, Price, and Prep Time are required!");
+    return;
+  }
 
-        const sanitizedName = itemName.replace(/[^a-zA-Z0-9]/g, '_');
-        let imageUrl = itemToEdit?.itemImg || ""; // Keep existing image URL if not uploading new one
+  const sanitizedId = form.itemName.trim().replace(/[^a-zA-Z0-9]/g, '_');
+  let imageUrl = preview;
 
-        try {
-            // Check for duplicate name if adding a new item or renaming an existing one
-            if (!itemToEdit || sanitizedName !== originalDocumentId) {
-                const docRef = doc(db, `FoodPlaces/${restaurantId}/Menu/DefaultMenu/Items`, sanitizedName);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    alert("Item name already exists or sanitizes to an existing ID.");
-                    return;
-                }
-            }
-            
-            // 1. Upload new image if selected (Web SDK)
-            if (imageFile) {
-                // Image compression is complex in web, usually handled by server or a dedicated library. 
-                // For simplicity here, we skip explicit client-side compression.
-                const imageRef = ref(storage, `menu_images/${restaurantId}/${sanitizedName}.jpg`);
-                await uploadBytes(imageRef, imageFile);
-                imageUrl = await getDownloadURL(imageRef);
+  try {
+    if (imageFile) {
+      const imageRef = ref(storage, `menu_images/${safeId}/${Date.now()}_${sanitizedId}`);
+      await uploadBytes(imageRef, imageFile);
+      imageUrl = await getDownloadURL(imageRef);
 
-                // Delete old image if it existed and was renamed/replaced
-                if (itemToEdit && itemToEdit.itemImg) {
-                   const oldImageRef = ref(storage, itemToEdit.itemImg);
-                   await deleteObject(oldImageRef).catch(err => console.warn("Failed to delete old image:", err));
-                }
-            }
-            
-            // 2. Prepare Data and Batch Write (Web SDK)
-            const itemData = {
-                "Item Name": itemName,
-                "Item Price": itemPrice,
-                "Prep Time": parseInt(prepTime, 10),
-                "Item Description": itemDescription || "",
-                "Item Img": imageUrl,
-                "Available": isAvailable,
-            };
+      if (item?.["Item Img"]) {
+        await deleteObject(ref(storage, item["Item Img"])).catch(() => {});
+      }
+    }
 
-            const batch = writeBatch(db);
-            const newItemDocRef = doc(db, `FoodPlaces/${restaurantId}/Menu/DefaultMenu/Items`, sanitizedName);
+    const batch = writeBatch(db);
 
-            // If updating and the name changed, delete the old document
-            if (itemToEdit && sanitizedName !== originalDocumentId) {
-                const oldItemDocRef = doc(db, `FoodPlaces/${restaurantId}/Menu/DefaultMenu/Items`, originalDocumentId);
-                batch.delete(oldItemDocRef);
-            }
+    if (item && sanitizedId !== item.id) {
+      const oldRef = doc(db, `FoodPlaces/${restaurantId}/Menu/DefaultMenu/Items`, item.id);
 
-            // Set/Update the new/existing document
-            batch.set(newItemDocRef, itemData);
+      batch.delete(oldRef);
+    }
 
-            await batch.commit();
-            alert(`Item ${itemToEdit ? 'updated' : 'added'} successfully!`);
-            
-            onSaveSuccess(); // Reload parent list
-            onClose(); // Close the modal
+    const newRef = doc(db, `FoodPlaces/${restaurantId}/Menu/DefaultMenu/Items`, sanitizedId);
+    batch.set(newRef, {
+      "Item Name": form.itemName,
+      "Item Price": form.itemPrice,
+      "Prep Time": parseInt(form.prepTime),
+      "Item Description": form.itemDescription,
+      "Item Img": imageUrl,
+      "Available": form.isAvailable
+    });
 
-        } catch (error) {
-            console.error("Save/Update failed: ", error);
-            alert(`Failed to save item: ${error.message}`);
-        }
-    };
-    
-    // ... JSX for rendering the form inputs inside the modal ...
-    if (!isOpen) return null;
-
-    return (
-        <div className="modal-backdrop">
-            <div className="modal-content">
-                <h3>{itemToEdit ? "Edit Menu Item" : "Add New Menu Item"}</h3>
-                <form onSubmit={handleSubmit}>
-                    {/* Input fields corresponding to your Android EditTexts */}
-                    <input type="text" value={form.itemName} onChange={e => setForm({...form, itemName: e.target.value})} placeholder="Item Name" required />
-                    <input type="number" step="0.01" value={form.itemPrice} onChange={e => setForm({...form, itemPrice: e.target.value})} placeholder="Item Price" required />
-                    <input type="number" value={form.prepTime} onChange={e => setForm({...form, prepTime: e.target.value})} placeholder="Prep Time (minutes)" required />
-                    <textarea value={form.itemDescription} onChange={e => setForm({...form, itemDescription: e.target.value})} placeholder="Item Description" />
-
-                    {/* Web file input for image selection */}
-                    <label>Upload Image:</label>
-                    <input type="file" onChange={handleFileChange} accept="image/*" />
-                    
-                    {/* Availability Switch */}
-                    <label>
-                        <input type="checkbox" checked={form.isAvailable} onChange={e => setForm({...form, isAvailable: e.target.checked})} />
-                        Available
-                    </label>
-
-                    <div className="modal-actions">
-                        <button type="submit">{itemToEdit ? "Update" : "Add"}</button>
-                        <button type="button" onClick={onClose}>Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
+    await batch.commit();
+    alert("Saved successfully!");
+    onSuccess();
+    onClose();
+  } catch (err) {
+    console.error(err);
+    alert("Save failed: " + err.message);
+  }
 };
+
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto">
+        <div className="p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-3xl font-bold">{item ? "Edit" : "Add"} Menu Item</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <X size={32} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <input
+              type="text"
+              placeholder="Item Name"
+              value={form.itemName}
+              onChange={e => setForm({...form, itemName: e.target.value})}
+              className="w-full px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg"
+              required
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Price"
+                value={form.itemPrice}
+                onChange={e => setForm({...form, itemPrice: e.target.value})}
+                className="px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg"
+                required
+              />
+              <input
+                type="number"
+                placeholder="Prep Time (min)"
+                value={form.prepTime}
+                onChange={e => setForm({...form, prepTime: e.target.value})}
+                className="px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg"
+                required
+              />
+            </div>
+
+            <textarea
+              placeholder="Description (optional)"
+              value={form.itemDescription}
+              onChange={e => setForm({...form, itemDescription: e.target.value})}
+              rows="3"
+              className="w-full px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg resize-none"
+            />
+
+            <div className="space-y-4">
+              {preview && (
+                <img src={preview} alt="Preview" className="w-full h-64 object-cover rounded-2xl" />
+              )}
+              <label className="block">
+                <div className="border-2 border-dashed border-gray-400 rounded-2xl p-8 text-center cursor-pointer hover:border-purple-600 transition">
+                  <Upload className="w-12 h-12 mx-auto mb-3 text-gray-500" />
+                  <p className="text-lg">Click to upload image</p>
+                  <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                </div>
+              </label>
+            </div>
+
+            <label className="flex items-center gap-3 text-lg">
+              <input
+                type="checkbox"
+                checked={form.isAvailable}
+                onChange={e => setForm({...form, isAvailable: e.target.checked})}
+                className="w-6 h-6"
+              />
+              <span>Available for order</span>
+            </label>
+
+            <div className="flex gap-4 pt-6">
+              <button
+                type="submit"
+                className="flex-1 bg-purple-600 text-white font-bold py-5 rounded-xl text-xl hover:bg-purple-700 transition"
+              >
+                {item ? "Update Item" : "Add Item"}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 bg-gray-300 text-gray-800 font-bold py-5 rounded-xl text-xl hover:bg-gray-400 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
