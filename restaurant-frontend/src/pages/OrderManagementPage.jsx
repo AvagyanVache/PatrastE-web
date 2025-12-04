@@ -238,7 +238,7 @@ export default function OrderManagementPage() {
             if (customerDoc.exists()) {
                 const customerData = customerDoc.data();
                 order.customerName = customerData.name || "Unknown Customer";
-                order.customerPhone = customerData.phone || "N/A";
+                order.customerPhone = customerData.phoneNumber || "N/A";
                 order.customerEmail = customerData.email || "N/A";
             }
         } catch (e) {

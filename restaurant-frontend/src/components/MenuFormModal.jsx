@@ -110,7 +110,7 @@ export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onS
               placeholder="Item Name"
               value={form.itemName}
               onChange={e => setForm({...form, itemName: e.target.value})}
-              className="w-full px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg"
+              className="w-full px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-orange-600 focus:outline-none text-lg"
               required
             />
 
@@ -121,7 +121,7 @@ export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onS
                 placeholder="Price"
                 value={form.itemPrice}
                 onChange={e => setForm({...form, itemPrice: e.target.value})}
-                className="px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg"
+                className="px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-orange-600 focus:outline-none text-lg"
                 required
               />
               <input
@@ -129,7 +129,7 @@ export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onS
                 placeholder="Prep Time (min)"
                 value={form.prepTime}
                 onChange={e => setForm({...form, prepTime: e.target.value})}
-                className="px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg"
+                className="px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-orange-600 focus:outline-none text-lg"
                 required
               />
             </div>
@@ -139,7 +139,7 @@ export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onS
               value={form.itemDescription}
               onChange={e => setForm({...form, itemDescription: e.target.value})}
               rows="3"
-              className="w-full px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg resize-none"
+              className="w-full px-6 py-4 rounded-xl border-2 border-gray-300 focus:border-orange-600 focus:outline-none text-lg resize-none"
             />
 
             <div className="space-y-4">
@@ -147,7 +147,7 @@ export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onS
                 <img src={preview} alt="Preview" className="w-full h-64 object-cover rounded-2xl" />
               )}
               <label className="block">
-                <div className="border-2 border-dashed border-gray-400 rounded-2xl p-8 text-center cursor-pointer hover:border-purple-600 transition">
+                <div className="border-2 border-dashed border-gray-400 rounded-2xl p-8 text-center cursor-pointer hover:border-orange-600 transition">
                   <Upload className="w-12 h-12 mx-auto mb-3 text-gray-500" />
                   <p className="text-lg">Click to upload image</p>
                   <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
@@ -168,7 +168,7 @@ export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onS
             <div className="flex gap-4 pt-6">
               <button
                 type="submit"
-                className="flex-1 bg-purple-600 text-white font-bold py-5 rounded-xl text-xl hover:bg-purple-700 transition"
+                className="flex-1 bg-orange-600 text-white font-bold py-5 rounded-xl text-xl hover:bg-orange-700 transition"
               >
                 {item ? "Update Item" : "Add Item"}
               </button>

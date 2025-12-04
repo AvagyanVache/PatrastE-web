@@ -34,7 +34,7 @@ function ProtectedRoute({ children, allowedRoles }) {
 
 function RestaurantPending() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white text-4xl text-center p-8">
+    <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center text-white text-4xl text-center p-8">
       Your restaurant is pending admin approval.<br/>We'll notify you soon!
     </div>
   )
@@ -91,7 +91,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-white text-4xl">
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-orange-600 to-white-600 text-white text-4xl">
         Loading App...
       </div>
     )
