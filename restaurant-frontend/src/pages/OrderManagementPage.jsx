@@ -242,8 +242,8 @@ export default function OrderManagementPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 pt-16">
-        <Loader2 className="w-10 h-10 animate-spin text-purple-600 mr-2" />
-        <span className="text-xl font-medium text-purple-600">Loading Orders...</span>
+        <Loader2 className="w-10 h-10 animate-spin text-orange-600 mr-2" />
+        <span className="text-xl font-medium text-orange-600">Loading Orders...</span>
       </div>
     );
   }
@@ -275,7 +275,7 @@ export default function OrderManagementPage() {
         {/* Header (Matching your TextView) */}
         <div className="text-center mb-8 mt-4">
           <h1 className="text-4xl font-bold text-gray-800 drop-shadow-sm">
-            <ClipboardList className="inline w-10 h-10 mr-2 text-purple-600" />
+            <ClipboardList className="inline w-10 h-10 mr-2 text-orange-600" />
             Order Management
           </h1>
         </div>

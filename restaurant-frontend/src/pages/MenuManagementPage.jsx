@@ -144,7 +144,7 @@ export default function MenuManagementPage() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center">
         <div className="text-center">
           <div className="text-white text-4xl font-bold animate-pulse mb-4">
             Loading Menu...
@@ -162,7 +162,7 @@ export default function MenuManagementPage() {
   // Show error if no user
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center">
         <div className="text-white text-4xl font-bold">
           Please log in to manage your menu
         </div>
@@ -173,7 +173,7 @@ export default function MenuManagementPage() {
   // Show error if no restaurant ID found
   if (!restaurantId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center p-8">
         <div className="text-center">
           <div className="text-white text-4xl font-bold mb-6">
             No restaurant found for your account
@@ -196,7 +196,7 @@ export default function MenuManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 relative overflow-hidden">
       {/* Background Image */}
       <div 
         className="absolute inset-0 opacity-30"
@@ -223,7 +223,7 @@ export default function MenuManagementPage() {
         {/* Add Button */}
         <button
           onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
-          className="w-full bg-white text-purple-600 font-bold text-xl py-5 rounded-2xl shadow-2xl hover:bg-gray-100 transition mb-8 flex items-center justify-center gap-3"
+          className="w-full bg-white text-orange-600 font-bold text-xl py-5 rounded-2xl shadow-2xl hover:bg-gray-100 transition mb-8 flex items-center justify-center gap-3"
         >
           <Plus size={32} />
           Add New Item

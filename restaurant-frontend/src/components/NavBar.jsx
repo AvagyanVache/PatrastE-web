@@ -16,7 +16,7 @@ export default function NavBar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <span className="text-2xl font-bold text-purple-600">PatrastE</span>
+            <span className="text-2xl font-bold text-orange-300">PatrastE</span>
           </div>
           <div className="flex items-center space-x-4">
             {navItems.map((item) => (
@@ -25,7 +25,7 @@ export default function NavBar() {
                 to={item.path}
                 className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   location.pathname === item.path
-                    ? 'bg-purple-600 text-white shadow-md'
+                    ? 'bg-orange-600 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
                 }`}
               >
