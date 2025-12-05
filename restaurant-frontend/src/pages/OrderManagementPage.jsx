@@ -362,7 +362,7 @@ const fetchOrdersAndFilter = async (isCurrentOrders) => {
     <div className="min-h-screen bg-gray-50 relative overflow-hidden pt-16">
       {/* Background Image */}
       <div 
-        className="absolute inset-0 opacity-20"
+        className="absolute inset-0 opacity-100"
         style={{
           backgroundImage: 'url(/background4.jpg)', 
           backgroundSize: 'cover',
