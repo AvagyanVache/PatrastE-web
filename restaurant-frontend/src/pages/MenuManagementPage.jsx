@@ -1,6 +1,6 @@
 // src/pages/MenuManagementPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Plus, Upload, Clock, DollarSign, FileText, ToggleLeft } from 'lucide-react';
+import { Plus, Upload, Clock, FileText, ToggleLeft, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
@@ -230,54 +230,69 @@ export default function MenuManagementPage() {
         </button>
 
         {/* Menu Items Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {menuItems.map((item) => (
-            <div key={item.id} className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl overflow-hidden">
-              {String(item["Item Img"] || '') ? (
-                <img src={String(item["Item Img"])} alt={String(item["Item Name"] || 'Menu Item')} className="w-full h-48 object-cover" />
-              ) : (
-                <div className="bg-gray-200 border-2 border-dashed rounded-t-3xl w-full h-48 flex items-center justify-center">
-                  <Upload className="w-16 h-16 text-gray-400" />
-                </div>
-              )}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          {menuItems.map((item) => (
+            <div key={item.id} className="group bg-white/95 backdrop-blur rounded-xl shadow-xl overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-2xl">
+              
+              {String(item["Item Img"] || '') ? (
+                <img src={String(item["Item Img"])} alt={String(item["Item Name"] || 'Menu Item')} className="w-full h-32 object-cover" />
+              ) : (
+                <div className="bg-gray-200 border-2 border-dashed rounded-t-xl w-full h-32 flex items-center justify-center">
+                  <Upload className="w-10 h-10 text-gray-400" />
+                </div>
+              )}
 
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-800">{String(item["Item Name"] || 'Untitled Item')}</h3>
-                <div className="mt-3 space-y-2 text-gray-600">
-                 <p className="flex items-center gap-2">
+              <div className="p-4 flex flex-col flex-grow">
+                {/* 2. Title and Compact Details */}
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{String(item["Item Name"] || 'Untitled Item')}</h3>
+                
+                {/* Price, Time, and Status on a single line for compactness */}
+                <div className="flex justify-between items-center text-sm text-gray-600 border-b pb-2 mb-2">
+                  
+                  {/* Price */}
+                  <p className="font-semibold text-orange-600">
                     ֏{String(item["Item Price"] || '0.00')}
                   </p>
-                  <p className="flex items-center gap-2">
-                    <Clock size={20} /> {String(item["Prep Time"] || '0')} min
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <ToggleLeft size={20} /> {item.Available ? "Available" : "Unavailable"}
-                  </p>
-                  {item["Item Description"] && (
-                    <p className="flex items-center gap-2 text-sm">
-                      <FileText size={18} /> {String(item["Item Description"])}
-                    </p>
-                  )}
-                </div>
+                  
+                  {/* Prep Time */}
+                  <p className="flex items-center gap-1">
+                    <Clock size={16} className="text-black-500" /> {String(item["Prep Time"] || '0')} min
+                  </p>
+                  
+                  {/* Status - Use color and icon for quick visibility */}
+                  <p className={`flex items-center gap-1 font-medium ${item.Available ? 'text-green-600' : 'text-red-600'}`}>
+                    <ToggleLeft size={16} /> {item.Available ? "Available" : "Unavailable"}
+                  </p>
+                </div>
 
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id, item["Item Img"])}
-                    className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                {/* Description (Conditional) */}
+                {item["Item Description"] && (
+                  <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                    {String(item["Item Description"])}
+                  </p>
+                )}
+              
+                {/* 3. Action Buttons (Hidden by Default) */}
+                <div className="mt-auto pt-2 flex justify-end gap-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300">
+                  <button
+                    onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
+                    className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition shadow-lg"
+                    title="Edit Item"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(item.id, item["Item Img"])}
+                    className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition shadow-lg"
+                    title="Delete Item"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {menuItems.length === 0 && (
           <div className="text-center mt-32">
