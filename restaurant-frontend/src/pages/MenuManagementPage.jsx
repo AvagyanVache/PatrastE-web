@@ -1,6 +1,6 @@
 // src/pages/MenuManagementPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Plus, Upload, Clock, FileText, ToggleLeft, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Upload, Clock, FileText, ToggleLeft, Pencil, Trash2,LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
@@ -8,13 +8,12 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import MenuFormModal from '../components/MenuFormModal';
 
 export default function MenuManagementPage() {
-  const { user } = useAuth();
+  const { user, logout} = useAuth();
   const [restaurantId, setRestaurantId] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [debugInfo, setDebugInfo] = useState({});
 
   // Function to get restaurant ID by owner
   async function getRestaurantIdByOwner(uid) {
@@ -64,28 +63,29 @@ export default function MenuManagementPage() {
       return;
     }
 
-    setDebugInfo({ uid: user.uid, email: user.email });
 
     getRestaurantIdByOwner(user.uid)
       .then(id => {
         console.log("✅ Restaurant ID retrieved:", id);
         setRestaurantId(id);
-        setDebugInfo(prev => ({ ...prev, restaurantId: id }));
       })
       .catch(err => {
         console.error("💥 Error getting restaurant ID:", err);
         setIsLoading(false);
-        setDebugInfo(prev => ({ ...prev, error: err.message }));
       });
   }, [user]);
 
   // Load menu items function
   const loadMenuItems = async () => {
-    if (!restaurantId) {
-      console.error("⏹️ Cannot load menu: restaurantId is null");
-      setIsLoading(false);
-      return;
-    }
+  // Before returning main content
+if (!restaurantId) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-gray-500 text-xl">Loading your restaurant...</div>
+    </div>
+  );
+}
+
 
     setIsLoading(true);
     const path = `FoodPlaces/${restaurantId}/Menu/DefaultMenu/Items`;
@@ -106,13 +106,11 @@ export default function MenuManagementPage() {
 
       console.log("✅ Setting menu items:", items.length);
       setMenuItems(items);
-      setDebugInfo(prev => ({ ...prev, itemCount: items.length }));
     } catch (err) {
       console.error("💥 Failed to load menu:", err);
       console.error("Error code:", err.code);
       console.error("Error message:", err.message);
       alert("Failed to load menu: " + err.message);
-      setDebugInfo(prev => ({ ...prev, loadError: err.message }));
     }
 
     setIsLoading(false);
@@ -149,11 +147,6 @@ export default function MenuManagementPage() {
           <div className="text-white text-4xl font-bold animate-pulse mb-4">
             Loading Menu...
           </div>
-          <div className="text-white text-sm bg-black/30 p-4 rounded-lg max-w-md">
-            <pre className="text-left text-xs overflow-auto">
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </div>
         </div>
       </div>
     );
@@ -170,31 +163,7 @@ export default function MenuManagementPage() {
     );
   }
 
-  // Show error if no restaurant ID found
-  if (!restaurantId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="text-white text-4xl font-bold mb-6">
-            No restaurant found for your account
-          </div>
-          <div className="text-white text-lg mb-4">
-            User ID: {user.uid}
-          </div>
-          <div className="text-white text-sm bg-black/30 p-4 rounded-lg max-w-2xl">
-            <div className="mb-2">Debug Info:</div>
-            <pre className="text-left text-xs overflow-auto">
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </div>
-          <div className="text-white text-base mt-6">
-            Make sure your FoodPlaces document has a "uid" field matching: {user.uid}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 relative overflow-hidden">
       {/* Background Image */}
@@ -207,20 +176,22 @@ export default function MenuManagementPage() {
         }}
       />
 
-      <div className="relative z-10 p-6 pb-24">
-        {/* Header */}
-        <div className="text-center mb-8 mt-12">
-          <h1 className="text-5xl font-bold text-white drop-shadow-lg">Menu Management</h1>
-          <p className="text-white text-xl mt-2">Restaurant: {restaurantId}</p>
-          <button 
-            onClick={() => console.log("Debug:", debugInfo)}
-            className="text-white text-sm underline mt-2"
-          >
-            Show Debug Info
-          </button>
-        </div>
 
-        {/* Add Button */}
+<div className="relative z-10 p-6 pb-24">
+          <div className="flex justify-between items-start mb-8 mt-6">
+          <div className="text-center flex-grow">
+            <h1 className="text-4xl font-bold text-white drop-shadow-lg">Menu Management</h1>
+          </div>
+          <button 
+            onClick={logout}
+            className="flex items-center gap-1 text-white text-sm bg-black/20 hover:bg-black/50 p-2 rounded-lg transition"
+          >
+            <LogOut size={16} /> 
+            Log Out
+          </button>
+
+        </div>
+
         <button
           onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
           className="w-full bg-white text-orange-600 font-bold text-xl py-5 rounded-2xl shadow-2xl hover:bg-gray-100 transition mb-8 flex items-center justify-center gap-3"
@@ -229,7 +200,6 @@ export default function MenuManagementPage() {
           Add New Item
         </button>
 
-        {/* Menu Items Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
           {menuItems.map((item) => (
             <div key={item.id} className="group bg-white/95 backdrop-blur rounded-xl shadow-xl overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-2xl">
@@ -243,18 +213,14 @@ export default function MenuManagementPage() {
               )}
 
               <div className="p-4 flex flex-col flex-grow">
-                {/* 2. Title and Compact Details */}
                 <h3 className="text-xl font-bold text-gray-800 mb-2">{String(item["Item Name"] || 'Untitled Item')}</h3>
                 
-                {/* Price, Time, and Status on a single line for compactness */}
                 <div className="flex justify-between items-center text-sm text-gray-600 border-b pb-2 mb-2">
                   
-                  {/* Price */}
                   <p className="font-semibold text-orange-600">
                     ֏{String(item["Item Price"] || '0.00')}
                   </p>
                   
-                  {/* Prep Time */}
                   <p className="flex items-center gap-1">
                     <Clock size={16} className="text-black-500" /> {String(item["Prep Time"] || '0')} min
                   </p>

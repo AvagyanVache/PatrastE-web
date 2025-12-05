@@ -1,4 +1,3 @@
-// src/App.jsx
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginScreen from './components/auth/LoginScreen'
 import SignupStep1 from './components/auth/SignupStep1'
@@ -10,108 +9,79 @@ import { signOut } from 'firebase/auth'
 import { useNavigate } from 'react-router-dom'
 import NavBar from './components/NavBar' 
 import OrderManagementPage from './pages/OrderManagementPage'
+
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth()
 
   if (loading) return <div className="flex items-center justify-center h-screen text-3xl bg-gray-100">Loading...</div>
   if (!user) return <Navigate to="/login" replace />
 
-  // --- 🛠️ UPDATED CHECK ---
-  const isRestaurant = user.role === "restaurant";
-  
-  // Check the boolean 'isApproved' field which is now on the user object
-  // Note: Firestore booleans are fetched as true/false, not strings like "approved"
-  const isApproved = user.isApproved === true; 
+  // --- 🛠️ UPDATED CHECK ---
+  const isRestaurant = user.role === "restaurant";
+  
+  // Check the boolean 'isApproved' field which is now on the user object
+  // Note: Firestore booleans are fetched as true/false, not strings like "approved"
+  const isApproved = user.isApproved === true; 
 
-  if (isRestaurant && !isApproved && window.location.pathname !== "/restaurant-pending") {
-    // Redirect if they are a restaurant AND NOT approved
-    return <Navigate to="/restaurant-pending" replace />;
-  }
+  if (isRestaurant && !isApproved && window.location.pathname !== "/restaurant-pending") {
+    // Redirect if they are a restaurant AND NOT approved
+    return <Navigate to="/restaurant-pending" replace />;
+  }
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/login" replace />
 
   return children
 }
 
 function RestaurantPending() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center text-white text-4xl text-center p-8">
-      Your restaurant is pending admin approval.<br/>We'll notify you soon!
-    </div>
-  )
-}
-
-function Home() {
-  return <div className="p-10 text-3xl">Customer Home Page</div>
-}
-
-// Debug + Logout Bar (will show on every page when logged in)
-function AuthDebugBar() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
-
-  if (!user) return null
-
-  const handleLogout = async () => {
-    await signOut(auth)
-    navigate('/login')
-  }
-
-  return (
-    <div className="fixed top-0 left-0 right-0 bg-black/90 text-white p-4 z-50 shadow-2xl">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <div>
-          <span className="font-bold">Logged in as:</span> {user.email || user.uid}
-          {' | '}
-          <span className="text-yellow-400 font-bold">Role: {user.role || 'unknown'}</span>
-          {user.restaurantId && <span className="text-green-400"> | restaurantId: {user.restaurantId}</span>}
-        </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-bold transition"
-        >
-          LOGOUT
-        </button>
-      </div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center text-white text-4xl text-center p-8">
+      Your restaurant is pending admin approval.<br/>We'll notify you soon!
     </div>
   )
 }
+
+function Home() {
+  return <div className="p-10 text-3xl">Customer Home Page</div>
+}
+
+// REMOVED: AuthDebugBar is no longer needed, so the component definition is removed.
+// function AuthDebugBar() { /* ... content removed ... */ }
+
 function RestaurantLayout({ children }) {
-    return (
-        <>
-            <NavBar />
-            <div className="pt-16">
-                {children}
-            </div>
-        </>
-    );
+    return (
+        <>
+            <NavBar />
+            {/* Since the AuthDebugBar is gone, the content no longer needs pt-16,
+              but we'll keep a small padding to ensure content doesn't hug the top. */}
+            <div className="pt-10"> 
+                {children}
+            </div>
+        </>
+    );
 }
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-orange-600 to-white-600 text-white text-4xl">
-        Loading App...
-      </div>
-    )
-  }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-orange-600 to-white-600 text-white text-4xl">
+        Loading App...
+      </div>
+    )
+  }
 
-  return (
+  return (
     <>
-      {/* NOTE: AuthDebugBar is fixed at the top (z-50) and has a p-4 padding.
-        The RestaurantLayout adds pt-16 (4rem) to push content down.
-        The DebugBar itself adds a small visual overlap because it is 4rem tall.
-        For a clean look, we'll keep the DebugBar but remember it sits *above* all content.
-      */}
-      <AuthDebugBar />
+      {/* REMOVED the <AuthDebugBar /> component call here, 
+        which was causing the fixed container at the top. */}
 
       <Routes>
         <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" replace />} />
         <Route path="/signup" element={<SignupStep1 />} />
         <Route path="/signup-step2" element={<SignupStep2 />} />
 
-        {/* --- Restaurant Protected Routes --- */}
+        {/* --- Restaurant Protected Routes --- */}
         <Route
           path="/restaurant-dashboard"
           element={
@@ -123,8 +93,8 @@ export default function App() {
           }
         />
 
-        {/* NEW ROUTE: Order Management */}
-        <Route
+        {/* NEW ROUTE: Order Management */}
+        <Route
           path="/orders"
           element={
             <ProtectedRoute allowedRoles={["restaurant"]}>

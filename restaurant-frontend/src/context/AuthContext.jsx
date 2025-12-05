@@ -1,7 +1,7 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from 'react'
 import { auth, db } from '../firebase'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged,signOut } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { useNavigate } from 'react-router-dom'
 
@@ -14,6 +14,17 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
+const logout = async () => {
+    try {
+      await signOut(auth);
+      // Navigate to the home page or login page after successful sign out
+      navigate("/", { replace: true }); 
+      console.log("User signed out and redirected.");
+    } catch (error) {
+      console.error("Error during sign out:", error);
+      throw error; // Re-throw the error for the component to handle if needed
+    }
+  };
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -77,8 +88,8 @@ export function AuthProvider({ children }) {
   }, [navigate]);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+    <AuthContext.Provider value={{ user, loading, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
