@@ -3,6 +3,7 @@ import LoginScreen from './components/auth/LoginScreen'
 import SignupStep1 from './components/auth/SignupStep1'
 import SignupStep2 from './components/auth/SignupStep2'
 import MenuManagementPage from './pages/MenuManagementPage'
+import ProfilePage from './pages/ProfilePage' 
 import { useAuth } from './context/AuthContext'
 import { auth } from './firebase'
 import { signOut } from 'firebase/auth'
@@ -92,7 +93,16 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
+<Route
+  path="/profile" // This path is used in NavBar
+  element={
+    <ProtectedRoute allowedRoles={["restaurant"]}>
+      <RestaurantLayout>
+        <ProfilePage /> {/* Renders the profile content */}
+      </RestaurantLayout>
+    </ProtectedRoute>
+  }
+/>
         {/* NEW ROUTE: Order Management */}
         <Route
           path="/orders"
