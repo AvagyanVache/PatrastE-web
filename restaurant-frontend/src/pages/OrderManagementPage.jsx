@@ -64,37 +64,28 @@ export default function OrderManagementPage() {
       });
   }, [user]);
 
-  // --- 2. Load Pending Orders (Real-time listener) ---
   useEffect(() => {
     if (!restaurantId) return;
 
-    setIsLoading(true);
+    // We'll use onSnapshot to keep the PENDING list immediately updated
     const ordersRef = collection(db, "orders");
     const q = query(
       ordersRef,
       where("restaurantId", "==", restaurantId),
-      where("approvalStatus", "==", "pendingApproval")
+      where("approvalStatus", "in", ["pendingApproval", "accepted"])
     );
 
-    // This is the real-time listener, equivalent to addSnapshotListener
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      try {
-        // Use Promise.all to fetch all necessary details concurrently
-        const fetchedOrders = await Promise.all(
-          querySnapshot.docs.map(docSnap => fetchOrderData(docSnap))
-        );
-        setOrders(fetchedOrders);
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error loading orders:", error);
-        setError(`Error loading orders: ${error.message}`);
-        setIsLoading(false);
-      }
-    });
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        // Trigger a full fetch/filter anytime the underlying order data changes
+        // This ensures the list updates when an order is accepted/declined/times out.
+        fetchOrdersAndFilter(activeTab === 'pending');
+    }, (error) => {
+      console.error("Listener error:", error);
+    });
 
-    // Clean up the listener when the component unmounts
-    return () => unsubscribe();
-  }, [restaurantId]);
+    // Cleanup listener
+    return () => unsubscribe();
+}, [restaurantId, activeTab]);
   
   // --- 3. Order Actions ---
 
@@ -264,30 +255,86 @@ export default function OrderManagementPage() {
 };
 
 
-const loadOrderHistory = async () => {
-    if (!restaurantId || historyLoading) return;
-    setHistoryLoading(true);
+const fetchOrdersAndFilter = async (isCurrentOrders) => {
+    if (!restaurantId) return;
 
-    const q = query(
-        collection(db, "orders"),
-        where("restaurantId", "==", restaurantId),
-        // Filter for orders that are no longer pending
-        where("approvalStatus", "in", ["accepted", "declined"]), 
-        orderBy("startTime", "desc") // Show most recent history first
-    );
+    if (isCurrentOrders) {
+        setIsLoading(true);
+    } else {
+        setHistoryLoading(true);
+    }
 
     try {
-        const querySnapshot = await getDocs(q);
-        const historyOrders = await Promise.all(
-            querySnapshot.docs.map(docSnap => fetchOrderData(docSnap))
+        // --- STEP 1: Get Current Server Time (Crucial for filtering) ---
+        // This replicates your Android logic of writing to 'serverTime/current' and reading the timestamp.
+        const serverTimeDocRef = doc(db, "serverTime", "current");
+        
+        // Write a serverTimestamp placeholder
+        await updateDoc(serverTimeDocRef, { timestamp: serverTimestamp() });
+        
+        // Read the confirmed server timestamp
+        const serverTimeDoc = await getDoc(serverTimeDocRef);
+        const currentTimestamp = serverTimeDoc.data()?.timestamp;
+
+        if (!currentTimestamp) {
+             throw new Error("Failed to fetch accurate server timestamp.");
+        }
+        
+        const currentTimeSeconds = currentTimestamp.seconds;
+
+        // --- STEP 2: Query all relevant orders (accepted/pending) ---
+        const ordersRef = collection(db, "orders");
+        
+        // We fetch ALL orders that are either pending or accepted.
+        // The final filtering into "current" vs "history" happens client-side based on endTime.
+        const q = query(
+            ordersRef,
+            where("restaurantId", "==", restaurantId),
+            where("approvalStatus", "in", ["pendingApproval", "accepted"]),
+            orderBy("startTime", "desc") // Sort by start time for consistent history
         );
-        setOrderHistory(historyOrders);
+
+        const querySnapshot = await getDocs(q);
+        const allRelevantOrders = [];
+
+        // --- STEP 3: Process and Filter ---
+        for (const docSnap of querySnapshot.docs) {
+            const order = await fetchOrderData(docSnap);
+            
+            // Determine if order is CURRENT or HISTORY based on endTime and server time
+            const endTimeTimestamp = order.endTime;
+            const endTimeSeconds = endTimeTimestamp ? endTimeTimestamp.seconds : Number.MAX_SAFE_INTEGER; // Pending orders might have no endTime or a very distant one
+
+            const isOngoing = endTimeSeconds > currentTimeSeconds;
+
+            if (isCurrentOrders) {
+                // Current orders tab should only show ongoing orders
+                if (isOngoing) {
+                    allRelevantOrders.push(order);
+                }
+            } else {
+                // History tab should only show orders that have passed their end time
+                if (!isOngoing) {
+                    allRelevantOrders.push(order);
+                }
+            }
+        }
+
+        if (isCurrentOrders) {
+            setOrders(allRelevantOrders);
+        } else {
+            setOrderHistory(allRelevantOrders);
+        }
 
     } catch (error) {
-        console.error("Error loading order history:", error);
-        Swal.fire('Error', 'Failed to load order history.', 'error');
+        console.error("Error loading orders:", error);
+        Swal.fire('Error', `Failed to load orders: ${error.message}`, 'error');
     } finally {
-        setHistoryLoading(false);
+        if (isCurrentOrders) {
+            setIsLoading(false);
+        } else {
+            setHistoryLoading(false);
+        }
     }
 };
   // --- Render Logic ---
@@ -339,10 +386,10 @@ const loadOrderHistory = async () => {
                     activeTab === 'pending' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'
                 }`}
             >
-                Pending Orders ({orders.length})
+                Current Orders ({orders.length})
             </button>
             <button
-                onClick={() => { setActiveTab('history'); loadOrderHistory(); }} // Trigger load on switch
+                onClick={() => { setActiveTab('history'); loadOrderHistory(); }} // Calls the updated wrapper
                 className={`px-8 py-3 text-lg font-bold rounded-r-lg transition-colors ${
                     activeTab === 'history' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'
                 }`}
