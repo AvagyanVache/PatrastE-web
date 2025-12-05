@@ -244,9 +244,9 @@ export default function MenuManagementPage() {
               <div className="p-6">
                 <h3 className="text-2xl font-bold text-gray-800">{String(item["Item Name"] || 'Untitled Item')}</h3>
                 <div className="mt-3 space-y-2 text-gray-600">
-                  <p className="flex items-center gap-2">
-                    <DollarSign size={20} /> ${String(item["Item Price"] || '0.00')}
-                  </p>
+                 <p className="flex items-center gap-2">
+                    ֏{String(item["Item Price"] || '0.00')}
+                  </p>
                   <p className="flex items-center gap-2">
                     <Clock size={20} /> {String(item["Prep Time"] || '0')} min
                   </p>
