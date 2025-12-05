@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase';
 import { doc, getDoc, updateDoc, collection, onSnapshot, getDocs, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Mail, Utensils, Phone, Clock, MapPin, Save, Upload, Edit3,XCircle, PlusCircle } from 'lucide-react';
+import { Mail, Utensils, Phone, Clock, MapPin, Save, Upload, Edit3,XCircle, PlusCircle, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -28,7 +28,7 @@ export default function ProfilePage() {
     const [isHoursOpen, setIsHoursOpen] = useState(false); // For toggling hours visibility
 const [addresses, setAddresses] = useState([]);
     const [newAddressInput, setNewAddressInput] = useState('');
-
+const [isPhoneEditing, setIsPhoneEditing] = useState(false);
     const restaurantId = user?.restaurantId; // Assuming restaurantId is available on the user object
 useEffect(() => {
     if (!restaurantDocId) {
@@ -166,7 +166,15 @@ if (!restaurantDocId) {
     return (
         <div className="min-h-screen bg-gray-50 pt-16 pb-12">
             <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-2xl border border-gray-100">
-                
+                <div className="flex justify-end mb-6">
+                    <button 
+                        onClick={logout}
+                        className="flex items-center gap-2 text-white font-bold bg-red-500 hover:bg-red-600 p-3 rounded-xl transition shadow-md"
+                    >
+                        <LogOut size={20} /> 
+                        Log Out
+                    </button>
+                </div>
                 <h1 className="text-4xl font-extrabold text-orange-600 mb-8 text-center border-b pb-4">
                     Restaurant Profile
                 </h1>
@@ -206,34 +214,43 @@ if (!restaurantDocId) {
                 <div className="space-y-6">
                     
                     {/* Name */}
-                    <div className="flex items-center p-4 bg-orange-50 rounded-lg shadow-inner">
-                        <Utensils className="w-6 h-6 text-orange-600 mr-4 flex-shrink-0" />
-                        <div className="flex-grow">
-                            <label htmlFor="nameInput" className="text-sm font-bold text-gray-700 block">Restaurant Name</label>
-                            <input 
-                                id="nameInput"
-                                type="text"
-                                value={nameInput}
-                                onChange={(e) => setNameInput(e.target.value)}
-                                className="w-full text-lg font-semibold text-gray-900 border-b border-orange-200 bg-transparent focus:border-orange-600 focus:outline-none transition"
-                            />
-                        </div>
-                    </div>
+                  <div className="flex items-center p-4 bg-gray-100 rounded-lg"> {/* Changed color to gray-100 */}
+                        <Utensils className="w-6 h-6 text-gray-500 mr-4 flex-shrink-0" /> {/* Changed icon color */}
+                        <div className="flex-grow">
+                            <label htmlFor="nameInput" className="text-sm font-bold text-gray-700 block">Restaurant Name</label>
+                            <p className="w-full text-lg font-semibold text-gray-900 py-1"> 
+                                {nameInput} {/* Display name as static text */}
+                            </p>
+                        </div>
+                    </div>
 
                     {/* Phone */}
-                    <div className="flex items-center p-4 bg-orange-50 rounded-lg shadow-inner">
-                        <Phone className="w-6 h-6 text-orange-600 mr-4 flex-shrink-0" />
-                        <div className="flex-grow">
-                            <label htmlFor="phoneInput" className="text-sm font-bold text-gray-700 block">Contact Phone</label>
-                            <input 
-                                id="phoneInput"
-                                type="tel"
-                                value={phoneInput}
-                                onChange={(e) => setPhoneInput(e.target.value)}
-                                className="w-full text-lg font-semibold text-gray-900 border-b border-orange-200 bg-transparent focus:border-orange-600 focus:outline-none transition"
-                            />
-                        </div>
-                    </div>
+                   <div className={`flex items-start p-4 rounded-lg shadow-inner transition duration-300 ${isPhoneEditing ? 'bg-orange-100 border border-orange-300' : 'bg-gray-50'}`}>
+                        <Phone className={`w-6 h-6 mr-4 flex-shrink-0 transition ${isPhoneEditing ? 'text-orange-600' : 'text-gray-500'}`} />
+                        <div className="flex-grow">
+                            <label htmlFor="phoneInput" className="text-sm font-bold text-gray-700 block">Contact Phone</label>
+                            {isPhoneEditing ? (
+                                <input 
+                                    id="phoneInput"
+                                    type="tel"
+                                    value={phoneInput}
+                                    onChange={(e) => setPhoneInput(e.target.value)}
+                                    className="w-full text-lg font-semibold text-gray-900 border-b border-orange-600 bg-transparent focus:outline-none"
+                                />
+                            ) : (
+                                <p className="text-lg font-semibold text-gray-900">{phoneInput || 'N/A'}</p>
+                            )}
+                        </div>
+                        
+                        {/* EDIT TOGGLE ICON */}
+                        <button
+                            onClick={() => setIsPhoneEditing(!isPhoneEditing)}
+                            className="flex-shrink-0 ml-4 p-1 rounded-full hover:bg-orange-200 transition"
+                            title={isPhoneEditing ? "Stop Editing" : "Edit Phone Number"}
+                        >
+                            <Edit3 className={`w-5 h-5 transition ${isPhoneEditing ? 'text-orange-600' : 'text-gray-400'}`} />
+                        </button>
+                    </div>
                     
                     {/* Email (Read-only from User Context) */}
                     <div className="flex items-center p-4 bg-gray-100 rounded-lg">

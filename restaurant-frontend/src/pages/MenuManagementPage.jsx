@@ -182,13 +182,7 @@ if (!restaurantId) {
           <div className="text-center flex-grow">
             <h1 className="text-4xl font-bold text-white drop-shadow-lg">Menu Management</h1>
           </div>
-          <button 
-            onClick={logout}
-            className="flex items-center gap-1 text-white text-sm bg-black/20 hover:bg-black/50 p-2 rounded-lg transition"
-          >
-            <LogOut size={16} /> 
-            Log Out
-          </button>
+        
 
         </div>
 
