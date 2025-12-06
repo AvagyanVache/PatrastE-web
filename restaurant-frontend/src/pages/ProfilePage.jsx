@@ -1,12 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase';
-import { doc, getDoc, updateDoc, collection, onSnapshot, getDocs, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, onSnapshot, getDocs, setDoc, writeBatch, deleteDoc} from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Mail, Utensils, Phone, Clock, MapPin, Save, Upload, Edit3,XCircle, PlusCircle, LogOut } from 'lucide-react';
+import { Mail, Utensils, Phone, Clock, MapPin, Save, Upload, Edit3,XCircle, PlusCircle, LogOut, CheckCircle } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-
+const MapPlaceholder = ({ lat, lng, address }) => {
+    return (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3 text-sm text-blue-800">
+            {address ? (
+                <>
+                    <p className="font-bold">Map Preview for: {address}</p>
+                    <p>Coordinates: Lat **{lat.toFixed(4)}**, Lng **{lng.toFixed(4)}**</p>
+                    <div className="w-full h-40 bg-gray-200 flex items-center justify-center mt-2 rounded">
+                        {/* Placeholder for actual map integration */}
+                    </div>
+                </>
+            ) : (
+                <p>Enter and validate an address to see a map preview.</p>
+            )}
+        </div>
+    );
+};
 // Initial structure for operating hours derived from XML
 const initialHours = {
     Monday: 'Closed', Tuesday: 'Closed', Wednesday: 'Closed',
@@ -25,11 +41,36 @@ export default function ProfilePage() {
     const [phoneInput, setPhoneInput] = useState('');
     const [hoursInput, setHoursInput] = useState(initialHours);
     const [logoFile, setLogoFile] = useState(null);
+    const [addresses, setAddresses] = useState([]);
+    const [isAddressesLoaded, setIsAddressesLoaded] = useState(false);
+    const restaurantId = user?.restaurantId; 
+    const [isLocallyModified, setIsLocallyModified] = useState(false);
+
+    const addressesCollectionRef = restaurantDocId 
+        ? collection(db, "FoodPlaces", restaurantDocId, "Addresses") 
+        : null;
+
+   
     const [isHoursOpen, setIsHoursOpen] = useState(false); // For toggling hours visibility
-const [addresses, setAddresses] = useState([]);
-    const [newAddressInput, setNewAddressInput] = useState('');
+const [addressesToDelete, setAddressesToDelete] = useState([]);    const [newAddressInput, setNewAddressInput] = useState('');
+    const [validationMessage, setValidationMessage] = useState('');
+    const [validatedAddress, setValidatedAddress] = useState(null);
 const [isPhoneEditing, setIsPhoneEditing] = useState(false);
-    const restaurantId = user?.restaurantId; // Assuming restaurantId is available on the user object
+const mockGeocodeAddress = async (address) => {
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 500)); 
+    
+    // Simple check: if the address contains '123 Main St' or 'Valid', return coordinates.
+    if (address.toLowerCase().includes('123 main st') || address.toLowerCase().includes('valid')) {
+        return { 
+            address: address,
+            lat: 40.7128 + Math.random() * 0.01, // Example coordinates for NYC area
+            lng: -74.0060 + Math.random() * 0.01 
+        };
+    } else {
+        return null; // Address is invalid or not found
+    }
+};
 useEffect(() => {
     if (!restaurantDocId) {
         setError("Restaurant identifier (restaurantId) is missing from the user context.");
@@ -48,7 +89,6 @@ useEffect(() => {
              setNameInput(data.name || ""); 
                 setPhoneInput(data.contactPhone || ""); 
                 setHoursInput({ ...initialHours, ...(data.operatingHours || {}) });
-                setAddresses(data.addresses || []);
                 setError("");
             } else {
                 setError("Restaurant does not exist or was removed.");
@@ -70,8 +110,84 @@ useEffect(() => {
         setHoursInput(prev => ({ ...prev, [day]: value }));
     };
 
-    // Handle logo file selection
-    const handleLogoChange = (e) => {
+// NEW second useEffect (Modified)
+useEffect(() => {
+    if (!addressesCollectionRef) return;
+
+    const unsubscribe = onSnapshot(
+        addressesCollectionRef,
+        async (querySnapshot) => { // <-- MAKE CALLBACK ASYNC
+            const fetchedAddresses = [];
+            const geocodePromises = []; 
+
+            if (!querySnapshot.empty) {
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const currentAddress = {
+                        id: docSnap.id, 
+                        address: data.address || "",
+                        lat: data.latitude || 0.0, 
+                        lng: data.longitude || 0.0,
+                        isAvailable: data.isAvailable !== undefined ? data.isAvailable : true,
+                    };
+
+                    // **LOGIC TO GEOCODE MISSING COORDS ON LOAD**
+                    if (currentAddress.address && (currentAddress.lat === 0.0 || currentAddress.lng === 0.0)) {
+                        geocodePromises.push(
+                            mockGeocodeAddress(currentAddress.address).then(result => {
+                                if (result) {
+                                    currentAddress.lat = result.lat;
+                                    currentAddress.lng = result.lng;
+                                }
+                                return currentAddress;
+                            })
+                        );
+                    } else {
+                        geocodePromises.push(Promise.resolve(currentAddress));
+                    }
+                });
+            }
+
+            // Await all geocoding (or promise resolutions)
+            const resolvedAddresses = await Promise.all(geocodePromises);
+            
+            // Only push successfully fetched/resolved addresses
+            resolvedAddresses.forEach(addr => fetchedAddresses.push(addr));
+
+setAddresses(prev => {
+                // 1. Get the list of new, unsaved addresses from the previous state
+                //    (items that were added via the UI and do NOT have a Firestore ID)
+                const unsaved = prev.filter(a => !a.id || a.id === null);
+
+                // 2. Filter out any unsaved addresses that have the same 'address' 
+                //    as a newly fetched/saved address to prevent the duplicate.
+                const newlySavedAddresses = fetchedAddresses.map(a => a.address);
+                const uniqueUnsaved = unsaved.filter(a => !newlySavedAddresses.includes(a.address));
+
+                // 3. Set the state to the new Firestore data PLUS the unique unsaved inputs.
+                return [...fetchedAddresses, ...uniqueUnsaved];
+            });
+            
+            setIsAddressesLoaded(true); 
+        },
+        (err) => {
+            console.error("Firestore listen failed for addresses subcollection:", err);
+            setError("Failed to fetch address list.");
+        }
+    );
+
+    return () => unsubscribe();
+}, [addressesCollectionRef]);
+
+
+        // Helper to create a new address object
+    const getNewEmptyAddress = (addressText = '') => ({
+        id: null, // Indicates a new document that needs to be created
+        address: addressText,
+        lat: 0.0,
+        lng: 0.0,
+        isAvailable: true,
+    });    const handleLogoChange = (e) => {
         const file = e.target.files[0];
         if (file) {
             setLogoFile(file);
@@ -85,57 +201,210 @@ useEffect(() => {
         return await getDownloadURL(logoRef);
     };
 
-const handleAddAddress = () => {
+ const checkAddressInMap = async () => {
         const trimmedAddress = newAddressInput.trim();
-        // Prevent adding empty or duplicate addresses
-        if (trimmedAddress && !addresses.includes(trimmedAddress)) {
-            setAddresses(prev => [...prev, trimmedAddress]);
-            setNewAddressInput('');
+        if (!trimmedAddress) {
+            setValidationMessage("Please enter an address to validate.");
+            return;
         }
-    };
 
-    const handleDeleteAddress = (addressToDelete) => {
-        setAddresses(prev => prev.filter(addr => addr !== addressToDelete));
-    };
-        const handleSave = async () => {
-      if (!restaurantDocId || isSaving) return; 
-        setIsSaving(true);
-        setError('');
+        setValidationMessage('Validating address...');
+        setValidatedAddress(null);
 
         try {
-            const updates = {
-              name: nameInput.trim(), 
-                contactPhone: phoneInput.trim(), 
-                operatingHours: hoursInput, // Use camelCase field name
-                addresses: addresses,
-            };
+const result = await mockGeocodeAddress(trimmedAddress);
 
-            // 2a. Handle Logo Update
-            let logoUrl = restaurantData?.logoUrl;
-            if (logoFile) {
-                logoUrl = await uploadLogo(logoFile);
-                updates.logoUrl = logoUrl;
-                // Optional: Update user's profile picture URL in the users collection
-              
+            if (result && result.lat !== 0.0) {
+                setValidatedAddress({...result, id:null, isAvailable:true});
+                setValidationMessage(`Address validated successfully. Coordinates found: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.`);
+            } else {
+                setValidationMessage("Address could not be found or validated. Please try a different format.");
             }
-
-            // 2b. Update Restaurant Document
-           const docRef = doc(db, "FoodPlaces", restaurantDocId);
-            await updateDoc(docRef, updates);
-
-            setLogoFile(null); // Clear file input after successful upload
-            alert('Profile updated successfully!');// Use alert temporarily
         } catch (e) {
-            console.error("Error saving profile:", e);
-            setError(`Failed to save changes: ${e.message}`);
+            console.error("Geocoding failed:", e);
+            setValidationMessage("An error occurred during validation.");
+        }
+    };
+    
+    // Updates address and geocodes on change
+    const handleAddressInputChange = async (index, newAddress) => {
+        const updatedAddresses = [...addresses];
+        const addrToUpdate = updatedAddresses[index];
+        addrToUpdate.address = newAddress;
+
+        if (newAddress.trim() !== '') {
+const geocoded = await mockGeocodeAddress(newAddress);
+            if (geocoded) {
+                addrToUpdate.lat = geocoded.lat;
+                addrToUpdate.lng = geocoded.lng;
+            } else {
+                addrToUpdate.lat = 0.0;
+                addrToUpdate.lng = 0.0;
+            }
+        } else {
+            // Reset coords if address is cleared
+            addrToUpdate.lat = 0.0;
+            addrToUpdate.lng = 0.0;
+        }
+
+        setAddresses(updatedAddresses);
+        setValidationMessage(''); 
+    };
+    
+    const handleAvailabilityToggle = (index, isChecked) => {
+        const updatedAddresses = [...addresses];
+        updatedAddresses[index].isAvailable = isChecked;
+        setAddresses(updatedAddresses);
+    };
+
+  const handleDeleteAddress = async (index) => {
+    const addressToDelete = addresses[index];
+    const isExisting = addressToDelete.id;
+
+    // 1. Remove from the local list immediately for UI responsiveness
+    const updatedAddresses = addresses.filter((_, i) => i !== index);
+    
+    // Ensure there's always one field (optional UI preference)
+    if (updatedAddresses.length === 0) {
+        setAddresses([getNewEmptyAddress()]); 
+    } else {
+        setAddresses(updatedAddresses);
+    }
+
+    // 2. Perform the actual deletion on the server
+    if (isExisting && addressesCollectionRef) {
+        setIsSaving(true); // Show saving indicator while deleting
+        setError('');
+        try {
+            // No need for a batch, just delete the document reference
+            const addrDocRef = doc(addressesCollectionRef, addressToDelete.id);
+            await deleteDoc(addrDocRef); // Make sure to import deleteDoc from 'firebase/firestore'
+            // The onSnapshot listener will update the local 'addresses' state shortly,
+            // but we already filtered it out locally in step 1.
+            alert('Address deleted successfully!');
+        } catch (e) {
+            console.error("Error deleting address:", e);
+            setError(`Failed to delete address: ${e.message}.`);
+            // If deletion fails, we should re-add the address to local state for retry
+            setAddresses(prev => [...prev, addressToDelete]); 
         } finally {
             setIsSaving(false);
         }
+    }
+};
+
+    // Function to add a new empty address input field
+    const addNewAddressField = () => {
+        setAddresses(prev => [...prev, getNewEmptyAddress()]);
     };
 
-    // --- Loading and Error States ---
+    // Function to add the *validated* address
+    const handleAddValidatedAddress = () => {
+        if (!validatedAddress) {
+            setValidationMessage("Please validate the address first.");
+            return;
+        }
+
+        // Prevent adding duplicate addresses
+        const isDuplicate = addresses.some(addr => addr.address === validatedAddress.address);
+        if (isDuplicate) {
+            setValidationMessage("This address has already been added.");
+            return;
+        }
+
+        // Add the new address to the main list
+        setAddresses(prev => [...prev, validatedAddress]);
+        
+        // Clear the input and validation states
+        setNewAddressInput('');
+        setValidatedAddress(null);
+        setValidationMessage('');
+    }; 
+    
+ // --- SAVE FUNCTION (Simplified) ---
+const handleSave = async () => {
+    if (!restaurantDocId || isSaving) return;
+    setIsSaving(true);
+    setError('');
+
+    try {
+        const mainDocRef = doc(db, "FoodPlaces", restaurantDocId);
+        const batch = writeBatch(db); 
+
+        // 1. Handle main document updates (Unchanged)
+        const mainUpdates = { /* ... your main document data ... */ };
+        let logoUrl = restaurantData?.logoUrl;
+        if (logoFile) {
+             logoUrl = await uploadLogo(logoFile);
+             mainUpdates.logoUrl = logoUrl;
+        }
+        batch.update(mainDocRef, mainUpdates);
+
+        // 2. Handle Address Subcollection creation/updates (Only creation/update remains)
+        addresses.forEach(addr => {
+            if (addr.address.trim() === '') {
+                // Ignore empty address fields
+                return;
+            }
+            
+            const firestoreData = {
+                address: addr.address,
+                latitude: addr.lat, 
+                longitude: addr.lng,
+                isAvailable: addr.isAvailable,
+            };
+
+            if (addr.id) {
+                // Existing address: UPDATE
+                const addrDocRef = doc(addressesCollectionRef, addr.id);
+                batch.update(addrDocRef, firestoreData);
+            } else {
+                // New address: CREATE (set)
+                const newDocRef = doc(addressesCollectionRef);
+                batch.set(newDocRef, firestoreData);
+            }
+        });
+
+        // Commit the batch
+        await batch.commit();
+
+        // Reset states
+        setLogoFile(null);
+        alert('Profile and Addresses updated successfully!');
+
+    } catch (e) {
+        console.error("Error saving profile:", e);
+        setError(`Failed to save changes: ${e.message}`);
+    } finally {
+        setIsSaving(false);
+    }
+};
+
+    // --- Loading and Error States (Unchanged) ---
     if (!user) {
         return <div className="min-h-screen pt-16 flex items-center justify-center text-gray-700">Please log in.</div>;
+    }
+    if (!restaurantDocId) {
+        return (
+            <div className="min-h-screen pt-16 flex items-center justify-center text-gray-700">
+                No restaurantId found in user profile.
+            </div>
+        );
+    }
+
+    if (error) { 
+        return (
+            <div className="min-h-screen pt-16 flex items-center justify-center">
+                 <div className="bg-red-100 text-red-700 p-6 rounded-xl text-xl text-center shadow-lg">{error}</div>
+            </div>
+        );
+    }
+    if (!restaurantData) {
+        return (
+            <div className="min-h-screen pt-16 flex items-center justify-center">
+                <div className="text-gray-500 text-xl">Loading profile data...</div>
+            </div>
+        );
     }
 if (!restaurantDocId) {
     return (
@@ -293,63 +562,76 @@ if (!restaurantDocId) {
                     )}
                 </div>
 
-          {/* Addresses Section (Updated for editing/adding) */}
-<div className="mt-10 border border-gray-200 rounded-xl p-6 shadow-lg">
-    <h2 className="text-2xl font-bold text-gray-800 flex items-center mb-4">
-        <MapPin className="w-6 h-6 text-orange-600 mr-3" />
-        Restaurant Address(es)
-    </h2>
-    
-    {/* Display Existing Addresses */}
-    <div className="space-y-3">
-        {addresses.length === 0 ? (
-            <p className="text-gray-500 italic p-2 border-l-4 border-gray-300">No addresses added yet.</p>
-        ) : (
-            addresses.map((addr, index) => (
-                <div 
-                    key={index} 
-                    className="flex justify-between items-center p-3 border border-gray-200 bg-white rounded-lg shadow-sm"
-                >
-                    <span className="text-base text-gray-700">{addr}</span>
-                    <button 
-                        onClick={() => handleDeleteAddress(addr)}
-                        className="text-red-500 hover:text-red-700 transition"
-                        title="Remove address"
-                    >
-                        <XCircle className="w-5 h-5" />
-                    </button>
-                </div>
-            ))
-        )}
-    </div>
+       <div className="mt-10 border border-gray-200 rounded-xl p-6 shadow-lg">
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center mb-4">
+                        <MapPin className="w-6 h-6 text-orange-600 mr-3" />
+                        Restaurant Address(es)
+                    </h2>
 
-    {/* Add New Address Input */}
-    <div className="mt-6 pt-4 border-t border-gray-100 flex gap-2">
-        <input
-            type="text"
-            placeholder="Enter new address (e.g., 123 Main St, City)"
-            value={newAddressInput}
-            onChange={(e) => setNewAddressInput(e.target.value)}
-            className="flex-grow p-2 border border-gray-300 rounded-l-md focus:border-orange-500 focus:ring focus:ring-orange-200 transition"
-            onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddAddress();
-                }
-            }}
-        />
-        <button
-            onClick={handleAddAddress}
-            disabled={!newAddressInput.trim()}
-            className="flex-shrink-0 flex items-center gap-1 bg-orange-600 text-white font-medium py-2 px-4 rounded-r-md hover:bg-orange-700 transition disabled:bg-gray-400"
-            title="Add Address"
-        >
-            <PlusCircle className="w-5 h-5" />
-            Add
-        </button>
-    </div>
+                    {/* Display Existing/Editable Addresses */}
+                    <div className="space-y-4 pt-2">
+                        {addresses.map((addr, index) => (
+                            <div 
+                                key={addr.id || `new-${index}`} 
+                                className="p-3 border border-gray-200 bg-white rounded-lg shadow-sm"
+                            >
+                                {/* Input and Coordinates Row */}
+                                <div className="flex gap-2 mb-2 items-center">
+                                    <input
+                                        type="text"
+                                        placeholder="Enter full address"
+                                        value={addr.address}
+                                        onChange={(e) => handleAddressInputChange(index, e.target.value)}
+                                        className="flex-grow p-2 border border-gray-300 rounded-md focus:border-orange-500 focus:ring focus:ring-orange-200 transition"
+                                    />
+                                    <span className="text-xs text-gray-500 flex-shrink-0 w-32 text-right">
+                                        Lat: {addr.lat.toFixed(4)}<br/>Lng: {addr.lng.toFixed(4)}
+                                    </span>
+                                </div>
+                                
+                                {/* Controls Row (Availability and Delete) */}
+                                <div className="flex justify-between items-center">
+                                    <label className="flex items-center text-sm font-medium text-gray-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={addr.isAvailable}
+                                            onChange={(e) => handleAvailabilityToggle(index, e.target.checked)}
+                                            className="mr-2 h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                                        />
+                                        Available for Delivery/Pickup
+                                    </label>
+                                    
+                                    <button 
+                                        onClick={() => handleDeleteAddress(index)}
+                                        className="text-red-500 hover:text-red-700 transition"
+                                        title="Remove address"
+                                    >
+                                        <XCircle className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add New Address Button (to add a new empty field) */}
+                  <div className="mt-6 pt-4 border-t border-gray-100">
+    <button
+        type="button"  // <-- ADD THIS LINE
+        onClick={addNewAddressField}
+        className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg hover:bg-gray-300 transition"
+        title="Add Another Address Field"
+    >
+        <PlusCircle className="w-5 h-5" />
+        Add Another Address Field
+    </button>
 </div>
+                    {/* Original "Add/Validate" block for temporary validation (optional to keep) */}
+                    {/* The Java logic suggests validation happens on text change, but keeping this block 
+                        allows for dedicated map preview if needed. Removed for brevity, but you can
+                        re-add the validation message, map placeholder, and dedicated "Add Validated Address"
+                        if you prefer that flow over the Java flow. */}
 
+                </div>
                 {/* Save Button */}
                 <button
                     onClick={handleSave}
@@ -361,4 +643,5 @@ if (!restaurantDocId) {
                 </button>
             </div>
         </div>
-    );}
+    );
+}
