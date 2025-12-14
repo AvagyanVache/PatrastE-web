@@ -69,8 +69,14 @@ export default function LoginScreen() {
                     <input type="checkbox" className="w-4 h-4" />
                     <span className="text-sm text-gray-600">Remember me</span>
                   </label>
-                  <Link to="/forgot-password" className="text-sm font-medium text-black hover:underline">Forgot password?</Link>
-                </div>
+<div className="flex justify-end mb-4">
+    <Link 
+        to="/forgot-password" 
+        className="text-sm font-medium text-orange-600 hover:text-orange-800 transition-colors"
+    >
+        Forgot Password?
+    </Link>
+</div>           </div>
 
                 <button
                   type="submit"

@@ -6,6 +6,7 @@ import MenuManagementPage from './pages/MenuManagementPage'
 import ProfilePage from './pages/ProfilePage' 
 import { useAuth } from './context/AuthContext'
 import { auth } from './firebase'
+import ForgotPassword from './pages/ForgotPassword';
 import { signOut } from 'firebase/auth'
 import { useNavigate } from 'react-router-dom'
 import NavBar from './components/NavBar' 
@@ -81,7 +82,7 @@ export default function App() {
         <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" replace />} />
         <Route path="/signup" element={<SignupStep1 />} />
         <Route path="/signup-step2" element={<SignupStep2 />} />
-
+<Route path="/forgot-password" element={<ForgotPassword />} />
         {/* --- Restaurant Protected Routes --- */}
         <Route
           path="/restaurant-dashboard"

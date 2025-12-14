@@ -332,7 +332,11 @@ const handleSave = async () => {
         const batch = writeBatch(db); 
 
         // 1. Handle main document updates (Unchanged)
-        const mainUpdates = { /* ... your main document data ... */ };
+        const mainUpdates = {
+            name: nameInput, // <--- ADDED: Update restaurant name
+            contactPhone: phoneInput, // <--- ADDED: Update phone number
+            operatingHours: hoursInput,
+         };
         let logoUrl = restaurantData?.logoUrl;
         if (logoFile) {
              logoUrl = await uploadLogo(logoFile);
