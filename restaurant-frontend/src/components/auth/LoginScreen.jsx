@@ -46,7 +46,7 @@ export default function LoginScreen() {
                   placeholder="Enter your Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-600"
                   required
                 />
                 
@@ -56,7 +56,7 @@ export default function LoginScreen() {
                     placeholder="Enter your Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 pr-12"
+                    className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-600 pr-12"
                     required
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -81,7 +81,7 @@ export default function LoginScreen() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-6 bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition disabled:opacity-50"
+                  className="w-full mt-6 bg-orange-600 text-white font-bold py-4 rounded-xl hover:bg-orange-700 transition disabled:opacity-50"
                 >
                   {loading ? "Logging in..." : "Login"}
                 </button>

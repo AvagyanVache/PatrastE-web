@@ -1,8 +1,14 @@
-// src/components/auth/SignupStep1.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import AuthBackground from './AuthBackground'
 import { useNavigate } from 'react-router-dom'
+// Import your firebase config
+import { auth } from '../../firebase' 
+import { 
+  createUserWithEmailAndPassword, 
+  sendEmailVerification, 
+  applyActionCode 
+} from 'firebase/auth'
 
 export default function SignupStep1() {
   const [showPass, setShowPass] = useState(false)
@@ -11,22 +17,61 @@ export default function SignupStep1() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
   const navigate = useNavigate()
 
-  const handleContinue = (e) => {
-    e.preventDefault()
-    if (!email || !password || password !== confirmPassword) {
-      setError("Please fill all fields correctly and passwords must match")
-      return
+  // Validation Logic (Matches Java validateInput)
+  const validate = () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email)) {
+      setError("Please enter a valid email")
+      return false
     }
     if (password.length < 6) {
       setError("Password must be at least 6 characters")
-      return
+      return false
     }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      return false
+    }
+    return true
+  }
 
-    // Save to localStorage or context, then go to Step 2
-    localStorage.setItem('signupTemp', JSON.stringify({ email, password }))
-    navigate('/signup-step2')
+  const handleContinue = async (e) => {
+    e.preventDefault()
+    setError('')
+    
+    if (!validate()) return
+
+    try {
+      // 1. Create User (Matches signUpUser in Java)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+
+      // 2. Send Verification Email
+      await sendEmailVerification(user)
+      setIsVerifying(true)
+      alert("Verification email sent! Please verify your email.")
+
+      // 3. Start Polling (Matches checkEmailVerification in Java)
+      const interval = setInterval(async () => {
+        await user.reload()
+        if (user.emailVerified) {
+          clearInterval(interval)
+          localStorage.setItem('signupTemp', JSON.stringify({ 
+            email, 
+            password, 
+            uid: user.uid 
+          }))
+          navigate('/signup-step2')
+        }
+      }, 3000) // 3 seconds interval like Java
+
+    } catch (err) {
+      setError("Sign-up failed: " + err.message)
+      setIsVerifying(false)
+    }
   }
 
   return (
@@ -41,7 +86,9 @@ export default function SignupStep1() {
       <div className="px-4 pb-6">
         <div className="max-w-2xl mx-auto bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8">
           <h2 className="text-3xl font-bold text-black mb-2">Sign Up - Step 1 of 2</h2>
-          <p className="text-gray-600 mb-6">Please fill up your information</p>
+          <p className="text-gray-600 mb-6">
+            {isVerifying ? "Waiting for email verification..." : "Please fill up your information"}
+          </p>
 
           {error && <p className="text-red-500 mb-4">{error}</p>}
 
@@ -51,8 +98,9 @@ export default function SignupStep1() {
               placeholder="Enter your Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isVerifying}
               required
-              className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-600"
             />
 
             <div className="relative">
@@ -61,8 +109,9 @@ export default function SignupStep1() {
                 placeholder="Enter your Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isVerifying}
                 required
-                className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 pr-12"
+                className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-600 pr-12"
               />
               <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-5">
                 {showPass ? <EyeOff className="w-5 h-5 text-gray-500" /> : <Eye className="w-5 h-5 text-gray-500" />}
@@ -75,16 +124,21 @@ export default function SignupStep1() {
                 placeholder="Confirm your Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isVerifying}
                 required
-                className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 pr-12"
+                className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-600 pr-12"
               />
               <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-4 top-5">
                 {showConfirm ? <EyeOff className="w-5 h-5 text-gray-500" /> : <Eye className="w-5 h-5 text-gray-500" />}
               </button>
             </div>
 
-            <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition text-lg">
-              Continue
+            <button 
+              type="submit" 
+              disabled={isVerifying}
+              className={`w-full font-bold py-4 rounded-xl transition text-lg ${isVerifying ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}
+            >
+              {isVerifying ? "Verify Email..." : "Continue"}
             </button>
           </form>
         </div>

@@ -11,6 +11,7 @@ import { signOut } from 'firebase/auth'
 import { useNavigate } from 'react-router-dom'
 import NavBar from './components/NavBar' 
 import OrderManagementPage from './pages/OrderManagementPage'
+import RestaurantPending from './components/RestaurantPending'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth()
@@ -34,13 +35,6 @@ function ProtectedRoute({ children, allowedRoles }) {
   return children
 }
 
-function RestaurantPending() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center text-white text-4xl text-center p-8">
-      Your restaurant is pending admin approval.<br/>We'll notify you soon!
-    </div>
-  )
-}
 
 function Home() {
   return <div className="p-10 text-3xl">Customer Home Page</div>
@@ -83,7 +77,8 @@ export default function App() {
         <Route path="/signup" element={<SignupStep1 />} />
         <Route path="/signup-step2" element={<SignupStep2 />} />
 <Route path="/forgot-password" element={<ForgotPassword />} />
-        {/* --- Restaurant Protected Routes --- */}
+<Route path="/restaurant-pending" element={<RestaurantPending />} />
+
         <Route
           path="/restaurant-dashboard"
           element={

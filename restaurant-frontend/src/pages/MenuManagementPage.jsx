@@ -256,7 +256,7 @@ if (!restaurantId) {
 
         {menuItems.length === 0 && (
           <div className="text-center mt-32">
-            <div className="bg-yellow-500 text-white text-5xl font-bold p-16 rounded-3xl inline-block shadow-2xl">
+            <div className="bg-orange-500 text-white text-5xl font-bold p-16 rounded-3xl inline-block shadow-2xl">
               NO MENU ITEMS<br/>
               <span className="text-2xl">Click "Add New Item" to get started</span>
             </div>
