@@ -56,19 +56,26 @@ const [addressesToDelete, setAddressesToDelete] = useState([]);    const [newAdd
     const [validationMessage, setValidationMessage] = useState('');
     const [validatedAddress, setValidatedAddress] = useState(null);
 const [isPhoneEditing, setIsPhoneEditing] = useState(false);
-const mockGeocodeAddress = async (address) => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500)); 
-    
-    // Simple check: if the address contains '123 Main St' or 'Valid', return coordinates.
-    if (address.toLowerCase().includes('123 main st') || address.toLowerCase().includes('valid')) {
-        return { 
-            address: address,
-            lat: 40.7128 + Math.random() * 0.01, // Example coordinates for NYC area
-            lng: -74.0060 + Math.random() * 0.01 
-        };
-    } else {
-        return null; // Address is invalid or not found
+const geocodeAddress = async (address) => {
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+        );
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+            const location = data[0];
+            return {
+                address: address,
+                lat: parseFloat(location.lat),
+                lng: parseFloat(location.lon)
+            };
+        } else {
+            return null;
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+        return null;
     }
 };
 useEffect(() => {
@@ -131,18 +138,17 @@ useEffect(() => {
                         isAvailable: data.isAvailable !== undefined ? data.isAvailable : true,
                     };
 
-                    // **LOGIC TO GEOCODE MISSING COORDS ON LOAD**
-                    if (currentAddress.address && (currentAddress.lat === 0.0 || currentAddress.lng === 0.0)) {
-                        geocodePromises.push(
-                            mockGeocodeAddress(currentAddress.address).then(result => {
-                                if (result) {
-                                    currentAddress.lat = result.lat;
-                                    currentAddress.lng = result.lng;
-                                }
-                                return currentAddress;
-                            })
-                        );
-                    } else {
+if (currentAddress.address && (currentAddress.lat === 0.0 || currentAddress.lng === 0.0)) {
+    geocodePromises.push(
+        geocodeAddress(currentAddress.address).then(result => { // Change mockGeocodeAddress to geocodeAddress
+            if (result) {
+                currentAddress.lat = result.lat;
+                currentAddress.lng = result.lng;
+            }
+            return currentAddress;
+        })
+    );
+} else {
                         geocodePromises.push(Promise.resolve(currentAddress));
                     }
                 });
@@ -201,56 +207,69 @@ setAddresses(prev => {
         return await getDownloadURL(logoRef);
     };
 
- const checkAddressInMap = async () => {
-        const trimmedAddress = newAddressInput.trim();
-        if (!trimmedAddress) {
-            setValidationMessage("Please enter an address to validate.");
-            return;
+ // REPLACE with:
+const checkAddressInMap = async () => {
+    const trimmedAddress = newAddressInput.trim();
+    if (!trimmedAddress) {
+        setValidationMessage("Please enter an address to validate.");
+        return;
+    }
+
+    setValidationMessage('Validating address...');
+    setValidatedAddress(null);
+
+    try {
+        const result = await geocodeAddress(trimmedAddress); // Use real geocoding
+
+        if (result && result.lat !== 0.0) {
+            setValidatedAddress({...result, id:null, isAvailable:true});
+            setValidationMessage(`Address validated successfully. Coordinates found: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.`);
+        } else {
+            setValidationMessage("Address could not be found or validated. Please try a different format.");
         }
-
-        setValidationMessage('Validating address...');
-        setValidatedAddress(null);
-
-        try {
-const result = await mockGeocodeAddress(trimmedAddress);
-
-            if (result && result.lat !== 0.0) {
-                setValidatedAddress({...result, id:null, isAvailable:true});
-                setValidationMessage(`Address validated successfully. Coordinates found: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.`);
-            } else {
-                setValidationMessage("Address could not be found or validated. Please try a different format.");
-            }
-        } catch (e) {
-            console.error("Geocoding failed:", e);
-            setValidationMessage("An error occurred during validation.");
-        }
-    };
+    } catch (e) {
+        console.error("Geocoding failed:", e);
+        setValidationMessage("An error occurred during validation.");
+    }
+};
     
     // Updates address and geocodes on change
-    const handleAddressInputChange = async (index, newAddress) => {
-        const updatedAddresses = [...addresses];
-        const addrToUpdate = updatedAddresses[index];
-        addrToUpdate.address = newAddress;
+    // REPLACE the entire function with:
+// REPLACE the handleAddressInputChange function with this fixed version:
+const handleAddressInputChange = async (index, newAddress) => {
+    // First, update the address text immediately for responsive UI
+    const tempAddresses = [...addresses];
+    tempAddresses[index].address = newAddress;
+    setAddresses(tempAddresses);
 
-        if (newAddress.trim() !== '') {
-const geocoded = await mockGeocodeAddress(newAddress);
+    // Then geocode and update coordinates
+    if (newAddress.trim() !== '') {
+        const geocoded = await geocodeAddress(newAddress);
+        
+        // After geocoding completes, update the state again with coordinates
+        setAddresses(prev => {
+            const updated = [...prev];
             if (geocoded) {
-                addrToUpdate.lat = geocoded.lat;
-                addrToUpdate.lng = geocoded.lng;
+                updated[index].lat = geocoded.lat;
+                updated[index].lng = geocoded.lng;
             } else {
-                addrToUpdate.lat = 0.0;
-                addrToUpdate.lng = 0.0;
+                updated[index].lat = 0.0;
+                updated[index].lng = 0.0;
             }
-        } else {
-            // Reset coords if address is cleared
-            addrToUpdate.lat = 0.0;
-            addrToUpdate.lng = 0.0;
-        }
+            return updated;
+        });
+    } else {
+        // If address is cleared, reset coordinates
+        setAddresses(prev => {
+            const updated = [...prev];
+            updated[index].lat = 0.0;
+            updated[index].lng = 0.0;
+            return updated;
+        });
+    }
 
-        setAddresses(updatedAddresses);
-        setValidationMessage(''); 
-    };
-    
+    setValidationMessage('');
+};
     const handleAvailabilityToggle = (index, isChecked) => {
         const updatedAddresses = [...addresses];
         updatedAddresses[index].isAvailable = isChecked;
@@ -344,13 +363,24 @@ const handleSave = async () => {
         }
         batch.update(mainDocRef, mainUpdates);
 
-        // 2. Handle Address Subcollection creation/updates (Only creation/update remains)
-        addresses.forEach(addr => {
-            if (addr.address.trim() === '') {
-                // Ignore empty address fields
-                return;
+     const processedAddresses = await Promise.all(addresses.map(async (addr) => {
+            let finalLat = addr.lat;
+            let finalLng = addr.lng;
+
+            // If it's a new address or changed, and coordinates are 0, try geocoding one last time
+            if (addr.address.trim() !== '' && (finalLat === 0 || finalLng === 0)) {
+                const result = await geocodeAddress(addr.address);
+                if (result) {
+                    finalLat = result.lat;
+                    finalLng = result.lng;
+                }
             }
-            
+            return { ...addr, lat: finalLat, lng: finalLng };
+        }));
+
+        processedAddresses.forEach(addr => {
+            if (addr.address.trim() === '') return;
+
             const firestoreData = {
                 address: addr.address,
                 latitude: addr.lat, 
@@ -359,11 +389,9 @@ const handleSave = async () => {
             };
 
             if (addr.id) {
-                // Existing address: UPDATE
                 const addrDocRef = doc(addressesCollectionRef, addr.id);
                 batch.update(addrDocRef, firestoreData);
             } else {
-                // New address: CREATE (set)
                 const newDocRef = doc(addressesCollectionRef);
                 batch.set(newDocRef, firestoreData);
             }
@@ -581,13 +609,28 @@ if (!restaurantDocId) {
                             >
                                 {/* Input and Coordinates Row */}
                                 <div className="flex gap-2 mb-2 items-center">
-                                    <input
-                                        type="text"
-                                        placeholder="Enter full address"
-                                        value={addr.address}
-                                        onChange={(e) => handleAddressInputChange(index, e.target.value)}
-                                        className="flex-grow p-2 border border-gray-300 rounded-md focus:border-orange-500 focus:ring focus:ring-orange-200 transition"
-                                    />
+<input
+    type="text"
+    placeholder="Enter full address"
+    value={addr.address}
+    onChange={(e) => {
+        // Just update text for typing speed
+        const updated = [...addresses];
+        updated[index].address = e.target.value;
+        setAddresses(updated);
+    }}
+    onBlur={async (e) => {
+        // Geocode ONLY when user clicks away from the field
+        const result = await geocodeAddress(e.target.value);
+        if (result) {
+            const updated = [...addresses];
+            updated[index].lat = result.lat;
+            updated[index].lng = result.lng;
+            setAddresses(updated);
+        }
+    }}
+    className="flex-grow p-2 border border-gray-300 rounded-md focus:border-orange-500"
+/>
                                     <span className="text-xs text-gray-500 flex-shrink-0 w-32 text-right">
                                         Lat: {addr.lat.toFixed(4)}<br/>Lng: {addr.lng.toFixed(4)}
                                     </span>
