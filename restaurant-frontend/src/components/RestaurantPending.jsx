@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '../firebase'
-import { CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle , RefreshCw} from 'lucide-react'
 
 export default function RestaurantPending() {
   const [status, setStatus] = useState('pending') // 'pending', 'approved', 'rejected'
@@ -108,7 +108,26 @@ export default function RestaurantPending() {
                 Your restaurant "{restaurantData?.name || restaurantId}" is waiting for admin approval
               </p>
             </div>
-
+<div className="bg-orange-50 border border-orange-200 p-5 rounded-2xl text-left relative overflow-hidden">
+      <div className="absolute top-0 right-0 p-2 opacity-10">
+        <RefreshCw size={40} className="rotate-12" />
+      </div>
+      
+      <p className="text-sm font-bold text-orange-800 flex items-center gap-2">
+        <RefreshCw size={16} className="animate-spin-slow" /> 
+        Taking longer than expected?
+      </p>
+      <p className="mt-2 text-sm text-orange-700 leading-relaxed">
+        Our admins are usually fast, but sometimes the connection needs a little nudge. If you've been waiting for a while, try refreshing the page to sync the latest status.
+      </p>
+      
+      <button 
+        onClick={() => window.location.reload()}
+        className="mt-3 text-sm font-extrabold text-orange-600 hover:text-orange-800 underline transition-all"
+      >
+        Refresh now
+      </button>
+    </div>
             <div className="bg-orange-50 border-l-4 border-orange-600 p-4 rounded-lg text-left">
               <p className="text-sm text-gray-700">
                 <strong>What's next?</strong>

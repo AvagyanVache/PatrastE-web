@@ -3,12 +3,11 @@ import { useState } from 'react'
 import { ArrowLeft, Upload, MapPin, X } from 'lucide-react'
 import AuthBackground from './AuthBackground'
 import { auth, db, storage } from '../../firebase'
-import { doc, setDoc, getDoc, collection, addDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc, collection, addDoc, query, limit, getDocs } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { useNavigate } from 'react-router-dom'
 import { onSnapshot } from "firebase/firestore"
 import { useEffect } from "react"
-
 export default function SignupStep2() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -184,6 +183,7 @@ export default function SignupStep2() {
           restaurantId: name,
           uid: user.uid
         }))
+setupApprovalListener(name, apiLink)
 
         localStorage.removeItem('signupTemp')
         alert("Restaurant profile created! Your restaurant is pending approval.")
@@ -207,7 +207,133 @@ export default function SignupStep2() {
       setLoading(false)
     }
   }
+const fetchMenuFromApiAndSave = async (restaurantName, apiLink) => {
+  try {
+    // Check if menu already exists
+    const menuItemsRef = collection(db, "FoodPlaces", restaurantName, "Menu", "DefaultMenu", "Items")
+    const existingItemsSnapshot = await getDocs(query(menuItemsRef, limit(1)))
+    
+    if (!existingItemsSnapshot.empty) {
+      console.log("Menu already exists in Firestore, skipping API fetch")
+      return
+    }
 
+    // Fetch menu from API
+    console.log("Fetching menu from:", apiLink)
+    const response = await fetch(apiLink)
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    // Handle JSONBin.io response structure (data is wrapped in 'record' object)
+    let menuItems = data
+    if (data.record) {
+      menuItems = data.record
+    }
+    
+    console.log("API Response:", menuItems)
+
+    if (!Array.isArray(menuItems) || menuItems.length === 0) {
+      console.log("No menu items in API response")
+      return
+    }
+
+    console.log(`Processing ${menuItems.length} menu items...`)
+
+    // Process each menu item
+    const uploadPromises = menuItems.map(async (item) => {
+      let itemName = item.name?.trim() || `Item_${Math.random().toString(36).substr(2, 9)}`
+      const sanitizedItemName = itemName.replace(/[^a-zA-Z0-9]/g, '_')
+
+      const itemData = {
+        "Item Name": itemName,
+        "Item Price": String(item.price || 0),
+        "Prep Time": item.prepTime || 10,
+        "Item Description": item.description || "No description available",
+        "Available": true,
+        "Item Img": ""
+      }
+
+      // Upload image if URL is valid
+      if (item.image && item.image.startsWith('http')) {
+        try {
+          console.log(`Uploading image for ${itemName}...`)
+          const imageResponse = await fetch(item.image)
+          const imageBlob = await imageResponse.blob()
+          
+          const imageId = Math.random().toString(36).substr(2, 9)
+          const imageRef = ref(storage, `menu_images/${restaurantName}/${imageId}.jpg`)
+          await uploadBytes(imageRef, imageBlob)
+          itemData["Item Img"] = await getDownloadURL(imageRef)
+          console.log(`Image uploaded for ${itemName}`)
+        } catch (imgError) {
+          console.error(`Failed to upload image for ${itemName}:`, imgError)
+        }
+      }
+
+      // Save to Firestore
+      const itemRef = doc(db, "FoodPlaces", restaurantName, "Menu", "DefaultMenu", "Items", sanitizedItemName)
+      await setDoc(itemRef, itemData)
+      console.log(`Saved menu item: ${itemName}`)
+      
+      return itemData
+    })
+
+    await Promise.all(uploadPromises)
+    console.log("All menu items saved successfully")
+    
+  } catch (error) {
+    console.error("Error fetching/saving menu:", error)
+    console.error("Error details:", error.message)
+    throw error
+  }
+}
+const setupApprovalListener = (restaurantName, apiLink) => {
+  const restaurantRef = doc(db, "FoodPlaces", restaurantName)
+  
+  const unsubscribe = onSnapshot(restaurantRef, async (snapshot) => {
+    if (snapshot.exists()) {
+      const isApproved = snapshot.data().isApproved
+      
+      if (isApproved) {
+        console.log(`Restaurant ${restaurantName} approved`)
+        unsubscribe() // Stop listening
+        
+        if (apiLink && apiLink.trim()) {
+          try {
+            await fetchMenuFromApiAndSave(restaurantName, apiLink)
+            alert(`Menu loaded for ${restaurantName}`)
+            navigate('/dashboard', { 
+              state: { 
+                userRole: 'restaurant', 
+                restaurantId: restaurantName 
+              } 
+            })
+          } catch (error) {
+            alert("Restaurant approved but menu loading failed")
+            navigate('/dashboard', { 
+              state: { 
+                userRole: 'restaurant', 
+                restaurantId: restaurantName 
+              } 
+            })
+          }
+        } else {
+          alert(`Restaurant approved: ${restaurantName}`)
+          navigate('/dashboard', { 
+            state: { 
+              userRole: 'restaurant', 
+              restaurantId: restaurantName 
+            } 
+          })
+        }
+      }
+    }
+  })
+}
   return (
     <AuthBackground>
       <div className="p-8 flex items-center gap-6">
