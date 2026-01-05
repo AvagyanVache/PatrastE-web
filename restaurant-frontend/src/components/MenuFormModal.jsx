@@ -1,4 +1,3 @@
-// src/components/MenuFormModal.jsx
 import React, { useState, useEffect } from 'react';
 import { X, Upload } from 'lucide-react';
 import { db, storage } from '../firebase';
@@ -17,7 +16,6 @@ export default function MenuFormModal({ isOpen, onClose, item, restaurantId, onS
       setForm({
         itemName: item["Item Name"] || '',
         itemPrice: item["Item Price"] || '',
-        // FIX 3: Convert numeric Prep Time to String for React input value
         prepTime: String(item["Prep Time"] || ''), 
         itemDescription: item["Item Description"] || '',
         isAvailable: item.Available ?? true

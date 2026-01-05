@@ -1,4 +1,3 @@
-// src/pages/MenuManagementPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Plus, Upload, Clock, FileText, ToggleLeft, Pencil, Trash2,LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +14,6 @@ export default function MenuManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
-  // Function to get restaurant ID by owner
   async function getRestaurantIdByOwner(uid) {
     console.log("🔍 Searching for restaurant with uid:", uid);
     
@@ -31,7 +29,6 @@ export default function MenuManagementPage() {
       if (snapshot.empty) {
         console.error("❌ No restaurant found for this user");
         
-        // DEBUG: Let's see ALL restaurants to help diagnose
         const allRestaurants = await getDocs(collection(db, "FoodPlaces"));
         console.log("🏪 All restaurants in database:", allRestaurants.size);
         allRestaurants.forEach(doc => {
@@ -52,7 +49,6 @@ export default function MenuManagementPage() {
     }
   }
 
-  // Load restaurant ID when user is available
   useEffect(() => {
     console.log("👤 User state changed:", user ? user.uid : "No user");
     
@@ -75,9 +71,7 @@ export default function MenuManagementPage() {
       });
   }, [user]);
 
-  // Load menu items function
   const loadMenuItems = async () => {
-  // Before returning main content
 if (!restaurantId) {
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -116,7 +110,6 @@ if (!restaurantId) {
     setIsLoading(false);
   };
 
-  // Load menu items when restaurant ID changes
   useEffect(() => {
     console.log("🔄 Restaurant ID changed:", restaurantId);
     if (!restaurantId) {
@@ -138,8 +131,6 @@ if (!restaurantId) {
       alert("Delete failed: " + err.message);
     }
   };
-
-  // Show loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center">
@@ -152,7 +143,6 @@ if (!restaurantId) {
     );
   }
 
-  // Show error if no user
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 flex items-center justify-center">
@@ -166,7 +156,6 @@ if (!restaurantId) {
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-600 to-white-600 relative overflow-hidden">
-      {/* Background Image */}
       <div 
         className="absolute inset-0 opacity-30"
         style={{
@@ -219,20 +208,17 @@ if (!restaurantId) {
                     <Clock size={16} className="text-black-500" /> {String(item["Prep Time"] || '0')} min
                   </p>
                   
-                  {/* Status - Use color and icon for quick visibility */}
                   <p className={`flex items-center gap-1 font-medium ${item.Available ? 'text-green-600' : 'text-red-600'}`}>
                     <ToggleLeft size={16} /> {item.Available ? "Available" : "Unavailable"}
                   </p>
                 </div>
 
-                {/* Description (Conditional) */}
                 {item["Item Description"] && (
                   <p className="text-sm text-gray-500 mb-3 line-clamp-2">
                     {String(item["Item Description"])}
                   </p>
                 )}
               
-                {/* 3. Action Buttons (Hidden by Default) */}
                 <div className="mt-auto pt-2 flex justify-end gap-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300">
                   <button
                     onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
@@ -264,7 +250,6 @@ if (!restaurantId) {
         )}
       </div>
 
-      {/* Modal */}
       <MenuFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

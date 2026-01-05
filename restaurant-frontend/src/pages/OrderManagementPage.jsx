@@ -1,4 +1,3 @@
-// src/pages/OrderManagementPage.jsx
 import React, { useState, useEffect } from 'react';
 import OrderItem from '../components/OrderItem';
 import { db } from '../firebase';
@@ -14,17 +13,17 @@ import {
   serverTimestamp,
   getDoc,
   deleteDoc,
-  orderBy // <--- ADD THIS IMPORT
+  orderBy 
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import Swal from 'sweetalert2'; // For modern, better dialogs
+import Swal from 'sweetalert2'; 
 import { Clock, Loader2, ClipboardList } from 'lucide-react';
 
 export default function OrderManagementPage() {
   const { user } = useAuth();
   const [allCurrentOrders, setAllCurrentOrders] = useState([]);
   const [activeTab, setActiveTab] = useState('pending');
-  const [orderHistory, setOrderHistory] = useState([]); // NEW STATE
+  const [orderHistory, setOrderHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [restaurantId, setRestaurantId] = useState(null);
   const [currentOrderFilter, setCurrentOrderFilter] = useState('pendingApproval'); 
@@ -33,7 +32,6 @@ export default function OrderManagementPage() {
   const [error, setError] = useState(null);
 const [filteredCurrentOrders, setFilteredCurrentOrders] = useState([]);
 
-  // --- Utility Functions (Copied from MenuManagementPage) ---
   async function getRestaurantIdByOwner(uid) {
     try {
       const q = query(collection(db, "FoodPlaces"), where("uid", "==", uid));
@@ -46,7 +44,6 @@ const [filteredCurrentOrders, setFilteredCurrentOrders] = useState([]);
     }
   }
 
-  // --- 1. Load Restaurant ID ---
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
@@ -70,7 +67,6 @@ const [filteredCurrentOrders, setFilteredCurrentOrders] = useState([]);
   useEffect(() => {
     if (!restaurantId) return;
 
-    // We'll use onSnapshot to keep the PENDING list immediately updated
     const ordersRef = collection(db, "orders");
     const q = query(
       ordersRef,
@@ -79,43 +75,34 @@ const [filteredCurrentOrders, setFilteredCurrentOrders] = useState([]);
     );
 
    const unsubscribe = onSnapshot(q, (snapshot) => {
-        // When the Firestore data changes, we trigger a fetch and filter 
-        // to get the most up-to-date order list and server time.
-        fetchOrdersAndFilter(true); // Always refresh current orders on listener change
+        fetchOrdersAndFilter(true); 
     }, (error) => {
         console.error("Listener error:", error);
     });
 
-    // Cleanup listener
     return () => unsubscribe();
 },[restaurantId]);
   
 const loadOrderHistory = () => {
-    fetchOrdersAndFilter(false); // Pass false to indicate history fetch
+    fetchOrdersAndFilter(false); 
 };
 useEffect(() => {
     if (restaurantId) {
-        // We use fetchOrdersAndFilter(false) to trigger the history fetch
-        // This will set the initial orderHistory state
         fetchOrdersAndFilter(false); 
     }
-    // We don't return an unsubscribe function because we are using getDocs (one-time fetch)
 }, [restaurantId]);
 useEffect(() => {
-    // Only apply filtering if we are on the 'pending' tab
     if (activeTab === 'pending') {
         const filtered = allCurrentOrders.filter(order => order.approvalStatus === currentOrderFilter);
         setFilteredCurrentOrders(filtered);
     }
-}, [allCurrentOrders, activeTab, currentOrderFilter]); // Runs when data or filter changes
-  // Equivalent to acceptOrder(String orderId)
+}, [allCurrentOrders, activeTab, currentOrderFilter]); 
   const acceptOrder = async (orderId) => {
   const orderDocRef = doc(db, "orders", orderId);
 
   try {
     let totalPrepTimeMinutes = 0;
 
-    // STEP 1: Use transaction to atomically set status and server timestamp (startTime)
     await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(orderDocRef);
 
@@ -123,53 +110,43 @@ useEffect(() => {
         throw new Error("Order does not exist");
       }
 
-      // Safe retrieval of totalPrepTime
       totalPrepTimeMinutes = snapshot.data().totalPrepTime;
       if (totalPrepTimeMinutes == null) {
         throw new Error("Total prep time is missing or null");
       }
 
-      // The transaction updates:
       transaction.update(orderDocRef, {
         approvalStatus: "accepted",
-        startTime: serverTimestamp(), // Sets the server timestamp
+        startTime: serverTimestamp(),
       });
       
-      return totalPrepTimeMinutes; // Return the prep time for the next step
+      return totalPrepTimeMinutes; 
     });
 
-    // STEP 2: Wait for the transaction to complete, then read the document to get the confirmed 'startTime'.
-    // This replicates the Android success listener logic.
     const updatedSnapshot = await getDoc(orderDocRef);
     const startTimeTimestamp = updatedSnapshot.data()?.startTime;
     
     if (startTimeTimestamp) {
-      // Calculate endTime based on the confirmed startTime
       const startTimeMs = startTimeTimestamp.toMillis();
-      const totalPrepTimeMs = totalPrepTimeMinutes * 60 * 1000; // Convert minutes to milliseconds
+      const totalPrepTimeMs = totalPrepTimeMinutes * 60 * 1000; 
       const endTimeMs = startTimeMs + totalPrepTimeMs;
 
-      // STEP 3: Perform the final update to set endTime
       await updateDoc(orderDocRef, {
-        endTime: new Date(endTimeMs) // Firestore converts Date objects to Timestamps
+        endTime: new Date(endTimeMs) 
       });
 
-      // Show success message
       Swal.fire('Accepted!', `Order #${orderId.substring(0, 8)} accepted. End time calculated.`, 'success');
       
     } else {
-      // If startTime is unexpectedly null after transaction, log an error
       throw new Error("Server start time was null after transaction success.");
     }
 
   } catch (e) {
     console.error("Failed to accept order:", e);
-    // Show error message
     Swal.fire('Error', `Failed to accept order. Check console for details.`, 'error');
   }
 };
 
-  // Equivalent to declineOrder(String orderId) and updateOrderDeclineStatus(...)
   const declineOrder = async (orderId) => {
     const { value: reason } = await Swal.fire({
       title: 'Select Reason for Declining Order',
@@ -208,11 +185,10 @@ useEffect(() => {
         if (customReason) {
           finalReason = customReason;
         } else {
-          return; // Cancelled custom reason input
+          return;
         }
       }
 
-      // Update decline status
       const orderDocRef = doc(db, "orders", orderId);
       try {
         await updateDoc(orderDocRef, {
@@ -220,7 +196,6 @@ useEffect(() => {
           declineReason: finalReason,
         });
 
-        // Delete order after 2 seconds (similar to your Java Handler().postDelayed)
         setTimeout(async () => {
           try {
             await deleteDoc(orderDocRef);
@@ -240,7 +215,6 @@ useEffect(() => {
   const fetchOrderData = async (docSnap) => {
     let order = { id: docSnap.id, ...docSnap.data(), orderId: docSnap.id };
     
-    // Fetch Customer Details
     const customerId = order.userId;
     if (customerId) {
         try {
@@ -256,7 +230,6 @@ useEffect(() => {
         }
     }
     
-    // Fetch Restaurant Location/Name (For completeness, though generally known in this view)
     if (order.restaurantId) {
         try {
             const resDoc = await getDoc(doc(db, "FoodPlaces", order.restaurantId));
@@ -295,36 +268,29 @@ const fetchOrdersAndFilter = async (isCurrentOrders) => {
         
         const currentTimeSeconds = currentTimestamp.seconds;
 
-        // --- STEP 2: Query all relevant orders (accepted/pending) ---
         const ordersRef = collection(db, "orders");
         
-        // We fetch ALL orders that are either pending or accepted.
-        // The final filtering into "current" vs "history" happens client-side based on endTime.
         const q = query(
             ordersRef,
             where("restaurantId", "==", restaurantId),
             where("approvalStatus", "in", ["pendingApproval", "accepted"]),
-            orderBy("startTime", "desc") // Sort by start time for consistent history
+            orderBy("startTime", "desc") 
         );
 
        const querySnapshot = await getDocs(q);
-        const ongoingOrders = []; // Temporary array for ongoing orders
+        const ongoingOrders = [];
         const historicalOrders = [];
 
-        // --- STEP 3: Process and Filter ---
        for (const docSnap of querySnapshot.docs) {
             const order = await fetchOrderData(docSnap);
             
-            // Determine if order is CURRENT or HISTORY based on endTime and server time
             const endTimeTimestamp = order.endTime;
             const endTimeSeconds = endTimeTimestamp ? endTimeTimestamp.seconds : Number.MAX_SAFE_INTEGER; 
             const isOngoing = endTimeSeconds > currentTimeSeconds;
 
             if (isOngoing) {
-                // If ongoing, push to the current/ongoing list
                 ongoingOrders.push(order);
             } else {
-                // If passed its end time, push to the history list
                 historicalOrders.push(order);
             }
         
@@ -342,7 +308,6 @@ setOrderHistory(historicalOrders);
         }
     }
 };
-  // --- Render Logic ---
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 pt-16">
@@ -365,7 +330,6 @@ setOrderHistory(historicalOrders);
 
   return (
     <div className="min-h-screen bg-gray-50 relative overflow-hidden pt-16">
-      {/* Background Image */}
       <div 
         className="absolute inset-0 opacity-100"
         style={{
@@ -375,7 +339,6 @@ setOrderHistory(historicalOrders);
         }}
       />
       <div className="relative z-10 p-6 max-w-4xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8 mt-4">
           <h1 className="text-4xl font-bold text-gray-800 drop-shadow-sm">
             <ClipboardList className="inline w-10 h-10 mr-2 text-orange-600" />
@@ -383,7 +346,6 @@ setOrderHistory(historicalOrders);
           </h1>
         </div>
 
-        {/* Tab Navigation */}
        <div className="flex justify-center mb-6 bg-white p-2 rounded-xl shadow-md">
             <button
                 onClick={() => setActiveTab('pending')}
@@ -403,11 +365,8 @@ setOrderHistory(historicalOrders);
             </button>
         </div>
         
-        {/* Content based on Active Tab */}
-        {/* === PENDING TAB === */}
     {activeTab === 'pending' && (
             <div className="space-y-4">
-                {/* ** UPDATED SUB-NAVIGATION BAR COUNTS ** */}
                 <div className="flex justify-start mb-6 bg-white p-1 rounded-xl shadow-md border border-gray-100">
                     <button
                         onClick={() => setCurrentOrderFilter('pendingApproval')}
@@ -417,7 +376,6 @@ setOrderHistory(historicalOrders);
                                 : 'text-gray-600 hover:bg-gray-100'
                         }`}
                     >
-                        {/* Use allCurrentOrders for filtering */}
                         Waiting for Approval ({allCurrentOrders.filter(o => o.approvalStatus === 'pendingApproval').length})
                     </button>
                     <button
@@ -428,13 +386,10 @@ setOrderHistory(historicalOrders);
                                 : 'text-gray-600 hover:bg-gray-100'
                         }`}
                     >
-                        {/* Use allCurrentOrders for filtering */}
                         Accepted Orders ({allCurrentOrders.filter(o => o.approvalStatus === 'accepted').length})
                     </button>
                 </div>
-                {/* ** END SUB-NAVIGATION BAR ** */}
 
-                {/* Use filteredCurrentOrders for the list */}
               {filteredCurrentOrders.length === 0 ? (
                 <div className="text-center mt-10 p-10 bg-white rounded-xl shadow-lg border-t-4 border-green-500">
                   <p className="text-3xl font-bold text-green-600 mb-2">🎉 No {currentOrderFilter === 'pendingApproval' ? 'Orders Waiting' : 'Accepted Orders'}</p>
@@ -453,7 +408,6 @@ setOrderHistory(historicalOrders);
             </div>
         )}
 
-        {/* === HISTORY TAB === */}
         {activeTab === 'history' && (
             <div className="space-y-4">
                 {historyLoading ? (
@@ -466,8 +420,8 @@ setOrderHistory(historicalOrders);
                         <OrderItem 
                             key={order.id} 
                             order={order} 
-                            onAccept={null} // Pass null to hide action buttons
-                            onDecline={null} // Pass null to hide action buttons
+                            onAccept={null} 
+                            onDecline={null} 
                         />
                     ))
                 ) : (

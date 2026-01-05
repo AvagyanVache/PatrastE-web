@@ -19,15 +19,11 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (loading) return <div className="flex items-center justify-center h-screen text-3xl bg-gray-100">Loading...</div>
   if (!user) return <Navigate to="/login" replace />
 
-  // --- 🛠️ UPDATED CHECK ---
   const isRestaurant = user.role === "restaurant";
   
-  // Check the boolean 'isApproved' field which is now on the user object
-  // Note: Firestore booleans are fetched as true/false, not strings like "approved"
   const isApproved = user.isApproved === true; 
 
   if (isRestaurant && !isApproved && window.location.pathname !== "/restaurant-pending") {
-    // Redirect if they are a restaurant AND NOT approved
     return <Navigate to="/restaurant-pending" replace />;
   }
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/login" replace />
@@ -40,15 +36,12 @@ function Home() {
   return <div className="p-10 text-3xl">Customer Home Page</div>
 }
 
-// REMOVED: AuthDebugBar is no longer needed, so the component definition is removed.
-// function AuthDebugBar() { /* ... content removed ... */ }
 
 function RestaurantLayout({ children }) {
     return (
         <>
             <NavBar />
-            {/* Since the AuthDebugBar is gone, the content no longer needs pt-16,
-              but we'll keep a small padding to ensure content doesn't hug the top. */}
+
             <div className="pt-10"> 
                 {children}
             </div>
@@ -69,8 +62,7 @@ export default function App() {
 
   return (
     <>
-      {/* REMOVED the <AuthDebugBar /> component call here, 
-        which was causing the fixed container at the top. */}
+
 
       <Routes>
         <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" replace />} />
@@ -90,16 +82,15 @@ export default function App() {
           }
         />
 <Route
-  path="/profile" // This path is used in NavBar
+  path="/profile" 
   element={
     <ProtectedRoute allowedRoles={["restaurant"]}>
       <RestaurantLayout>
-        <ProfilePage /> {/* Renders the profile content */}
+        <ProfilePage /> 
       </RestaurantLayout>
     </ProtectedRoute>
   }
 />
-        {/* NEW ROUTE: Order Management */}
         <Route
           path="/orders"
           element={
@@ -120,7 +111,6 @@ export default function App() {
           }
         />
 
-        {/* Smart root redirect */}
         <Route path="/" element={
           user?.role === "restaurant"
             ? <Navigate to="/restaurant-dashboard" replace />

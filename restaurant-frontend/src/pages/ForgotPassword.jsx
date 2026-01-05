@@ -1,13 +1,10 @@
-// src/pages/ForgotPassword.jsx
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { sendPasswordResetEmail } from 'firebase/auth'; // 🛑 CORE LOGIC IMPORT
-import { auth } from '../firebase'; // Assuming 'auth' is exported from your firebase setup
-import Swal from 'sweetalert2'; // For modern alerts
+import { sendPasswordResetEmail } from 'firebase/auth'; 
+import { auth } from '../firebase';
+import Swal from 'sweetalert2'; 
 import { Loader2, ArrowLeft } from 'lucide-react';
-import AuthBackground from '../components/auth/AuthBackground'; // Re-use the background
-
+import AuthBackground from '../components/auth/AuthBackground'; 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,10 +21,8 @@ export default function ForgotPassword() {
     }
 
     try {
-      // 1. Firebase API call to send the reset link
       await sendPasswordResetEmail(auth, email.trim());
 
-      // 2. Success Feedback
       Swal.fire({
         title: 'Success! 📧',
         text: 'A password reset link has been sent to your registered email address.',
@@ -35,11 +30,9 @@ export default function ForgotPassword() {
         confirmButtonText: 'Continue to Login'
       });
       
-      // 3. Navigate back to the login page (or main page)
       navigate('/login'); 
       
     } catch (error) {
-      // 4. Handle Errors
       console.error("Password reset error:", error);
       let errorMessage = "Failed to send reset email. Please try again.";
       if (error.code === 'auth/user-not-found') {

@@ -1,4 +1,3 @@
-// src/components/MenuItem.jsx
 import React from 'react';
 
 export const MenuItem = ({ item, onEdit, onDelete }) => {

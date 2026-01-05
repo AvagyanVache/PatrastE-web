@@ -14,7 +14,6 @@ const MapPlaceholder = ({ lat, lng, address }) => {
                     <p className="font-bold">Map Preview for: {address}</p>
                     <p>Coordinates: Lat **{lat.toFixed(4)}**, Lng **{lng.toFixed(4)}**</p>
                     <div className="w-full h-40 bg-gray-200 flex items-center justify-center mt-2 rounded">
-                        {/* Placeholder for actual map integration */}
                     </div>
                 </>
             ) : (
@@ -23,7 +22,6 @@ const MapPlaceholder = ({ lat, lng, address }) => {
         </div>
     );
 };
-// Initial structure for operating hours derived from XML
 const initialHours = {
     Monday: 'Closed', Tuesday: 'Closed', Wednesday: 'Closed',
     Thursday: 'Closed', Friday: 'Closed', Saturday: 'Closed', Sunday: 'Closed'
@@ -51,7 +49,7 @@ export default function ProfilePage() {
         : null;
 
    
-    const [isHoursOpen, setIsHoursOpen] = useState(false); // For toggling hours visibility
+    const [isHoursOpen, setIsHoursOpen] = useState(false); 
 const [addressesToDelete, setAddressesToDelete] = useState([]);    const [newAddressInput, setNewAddressInput] = useState('');
     const [validationMessage, setValidationMessage] = useState('');
     const [validatedAddress, setValidatedAddress] = useState(null);
@@ -112,18 +110,16 @@ useEffect(() => {
 
 
 
-    // Handle form input changes for hours
     const handleHoursChange = (day, value) => {
         setHoursInput(prev => ({ ...prev, [day]: value }));
     };
 
-// NEW second useEffect (Modified)
 useEffect(() => {
     if (!addressesCollectionRef) return;
 
     const unsubscribe = onSnapshot(
         addressesCollectionRef,
-        async (querySnapshot) => { // <-- MAKE CALLBACK ASYNC
+        async (querySnapshot) => {
             const fetchedAddresses = [];
             const geocodePromises = []; 
 
@@ -140,7 +136,7 @@ useEffect(() => {
 
 if (currentAddress.address && (currentAddress.lat === 0.0 || currentAddress.lng === 0.0)) {
     geocodePromises.push(
-        geocodeAddress(currentAddress.address).then(result => { // Change mockGeocodeAddress to geocodeAddress
+        geocodeAddress(currentAddress.address).then(result => { 
             if (result) {
                 currentAddress.lat = result.lat;
                 currentAddress.lng = result.lng;
@@ -154,23 +150,16 @@ if (currentAddress.address && (currentAddress.lat === 0.0 || currentAddress.lng 
                 });
             }
 
-            // Await all geocoding (or promise resolutions)
             const resolvedAddresses = await Promise.all(geocodePromises);
             
-            // Only push successfully fetched/resolved addresses
             resolvedAddresses.forEach(addr => fetchedAddresses.push(addr));
 
 setAddresses(prev => {
-                // 1. Get the list of new, unsaved addresses from the previous state
-                //    (items that were added via the UI and do NOT have a Firestore ID)
                 const unsaved = prev.filter(a => !a.id || a.id === null);
 
-                // 2. Filter out any unsaved addresses that have the same 'address' 
-                //    as a newly fetched/saved address to prevent the duplicate.
                 const newlySavedAddresses = fetchedAddresses.map(a => a.address);
                 const uniqueUnsaved = unsaved.filter(a => !newlySavedAddresses.includes(a.address));
 
-                // 3. Set the state to the new Firestore data PLUS the unique unsaved inputs.
                 return [...fetchedAddresses, ...uniqueUnsaved];
             });
             
@@ -186,9 +175,8 @@ setAddresses(prev => {
 }, [addressesCollectionRef]);
 
 
-        // Helper to create a new address object
     const getNewEmptyAddress = (addressText = '') => ({
-        id: null, // Indicates a new document that needs to be created
+        id: null, 
         address: addressText,
         lat: 0.0,
         lng: 0.0,
@@ -200,14 +188,12 @@ setAddresses(prev => {
         }
     };
 
-    // Upload logo to storage and update Firestore
     const uploadLogo = async (file) => {
         const logoRef = ref(storage, `restaurant_logos/${restaurantDocId}_logo`);
         await uploadBytes(logoRef, file);
         return await getDownloadURL(logoRef);
     };
 
- // REPLACE with:
 const checkAddressInMap = async () => {
     const trimmedAddress = newAddressInput.trim();
     if (!trimmedAddress) {
@@ -219,7 +205,7 @@ const checkAddressInMap = async () => {
     setValidatedAddress(null);
 
     try {
-        const result = await geocodeAddress(trimmedAddress); // Use real geocoding
+        const result = await geocodeAddress(trimmedAddress);
 
         if (result && result.lat !== 0.0) {
             setValidatedAddress({...result, id:null, isAvailable:true});
@@ -233,20 +219,14 @@ const checkAddressInMap = async () => {
     }
 };
     
-    // Updates address and geocodes on change
-    // REPLACE the entire function with:
-// REPLACE the handleAddressInputChange function with this fixed version:
 const handleAddressInputChange = async (index, newAddress) => {
-    // First, update the address text immediately for responsive UI
     const tempAddresses = [...addresses];
     tempAddresses[index].address = newAddress;
     setAddresses(tempAddresses);
 
-    // Then geocode and update coordinates
     if (newAddress.trim() !== '') {
         const geocoded = await geocodeAddress(newAddress);
         
-        // After geocoding completes, update the state again with coordinates
         setAddresses(prev => {
             const updated = [...prev];
             if (geocoded) {
@@ -259,7 +239,6 @@ const handleAddressInputChange = async (index, newAddress) => {
             return updated;
         });
     } else {
-        // If address is cleared, reset coordinates
         setAddresses(prev => {
             const updated = [...prev];
             updated[index].lat = 0.0;
@@ -280,31 +259,24 @@ const handleAddressInputChange = async (index, newAddress) => {
     const addressToDelete = addresses[index];
     const isExisting = addressToDelete.id;
 
-    // 1. Remove from the local list immediately for UI responsiveness
     const updatedAddresses = addresses.filter((_, i) => i !== index);
     
-    // Ensure there's always one field (optional UI preference)
     if (updatedAddresses.length === 0) {
         setAddresses([getNewEmptyAddress()]); 
     } else {
         setAddresses(updatedAddresses);
     }
 
-    // 2. Perform the actual deletion on the server
     if (isExisting && addressesCollectionRef) {
-        setIsSaving(true); // Show saving indicator while deleting
+        setIsSaving(true); 
         setError('');
         try {
-            // No need for a batch, just delete the document reference
             const addrDocRef = doc(addressesCollectionRef, addressToDelete.id);
-            await deleteDoc(addrDocRef); // Make sure to import deleteDoc from 'firebase/firestore'
-            // The onSnapshot listener will update the local 'addresses' state shortly,
-            // but we already filtered it out locally in step 1.
+            await deleteDoc(addrDocRef); 
             alert('Address deleted successfully!');
         } catch (e) {
             console.error("Error deleting address:", e);
             setError(`Failed to delete address: ${e.message}.`);
-            // If deletion fails, we should re-add the address to local state for retry
             setAddresses(prev => [...prev, addressToDelete]); 
         } finally {
             setIsSaving(false);
@@ -312,35 +284,29 @@ const handleAddressInputChange = async (index, newAddress) => {
     }
 };
 
-    // Function to add a new empty address input field
     const addNewAddressField = () => {
         setAddresses(prev => [...prev, getNewEmptyAddress()]);
     };
 
-    // Function to add the *validated* address
     const handleAddValidatedAddress = () => {
         if (!validatedAddress) {
             setValidationMessage("Please validate the address first.");
             return;
         }
 
-        // Prevent adding duplicate addresses
         const isDuplicate = addresses.some(addr => addr.address === validatedAddress.address);
         if (isDuplicate) {
             setValidationMessage("This address has already been added.");
             return;
         }
 
-        // Add the new address to the main list
         setAddresses(prev => [...prev, validatedAddress]);
         
-        // Clear the input and validation states
         setNewAddressInput('');
         setValidatedAddress(null);
         setValidationMessage('');
     }; 
     
- // --- SAVE FUNCTION (Simplified) ---
 const handleSave = async () => {
     if (!restaurantDocId || isSaving) return;
     setIsSaving(true);
@@ -350,10 +316,9 @@ const handleSave = async () => {
         const mainDocRef = doc(db, "FoodPlaces", restaurantDocId);
         const batch = writeBatch(db); 
 
-        // 1. Handle main document updates (Unchanged)
         const mainUpdates = {
-            name: nameInput, // <--- ADDED: Update restaurant name
-            contactPhone: phoneInput, // <--- ADDED: Update phone number
+            name: nameInput,
+            contactPhone: phoneInput,
             operatingHours: hoursInput,
          };
         let logoUrl = restaurantData?.logoUrl;
@@ -367,7 +332,6 @@ const handleSave = async () => {
             let finalLat = addr.lat;
             let finalLng = addr.lng;
 
-            // If it's a new address or changed, and coordinates are 0, try geocoding one last time
             if (addr.address.trim() !== '' && (finalLat === 0 || finalLng === 0)) {
                 const result = await geocodeAddress(addr.address);
                 if (result) {
@@ -397,10 +361,8 @@ const handleSave = async () => {
             }
         });
 
-        // Commit the batch
         await batch.commit();
 
-        // Reset states
         setLogoFile(null);
         alert('Profile and Addresses updated successfully!');
 
@@ -412,7 +374,6 @@ const handleSave = async () => {
     }
 };
 
-    // --- Loading and Error States (Unchanged) ---
     if (!user) {
         return <div className="min-h-screen pt-16 flex items-center justify-center text-gray-700">Please log in.</div>;
     }
@@ -447,7 +408,7 @@ if (!restaurantDocId) {
 }
 
 
-    if (error) { // Show specific error if the ID is missing or fetch failed
+    if (error) { 
         return (
             <div className="min-h-screen pt-16 flex items-center justify-center">
                  <div className="bg-red-100 text-red-700 p-6 rounded-xl text-xl text-center shadow-lg">{error}</div>
@@ -462,12 +423,10 @@ if (!restaurantDocId) {
         );
     }
     
-    // --- Render Component ---
 
    return (
     <div className="relative min-h-screen pt-16 pb-12 overflow-hidden">
 
-        {/* BACKGROUND IMAGE */}
         <div
             className="absolute inset-0 opacity-100 -z-10"
             style={{
@@ -476,7 +435,6 @@ if (!restaurantDocId) {
                 backgroundPosition: "center",
             }}
         />
-        {/* CONTENT */}
         <div className="max-w-4xl mx-auto p-6 bg-white/95 rounded-xl shadow-2xl border border-gray-100 relative z-10">
 
                 <div className="flex justify-end mb-6">
@@ -496,7 +454,6 @@ if (!restaurantDocId) {
                     <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</div>
                 )}
 
-                {/* Profile Header & Logo */}
                 <div className="flex flex-col items-center mb-10">
                     <div className="relative w-32 h-32 rounded-full border-4 border-orange-500 bg-gray-200 shadow-xl overflow-hidden">
                         <img 
@@ -523,21 +480,18 @@ if (!restaurantDocId) {
                 </div>
 
 
-                {/* Restaurant Details Section */}
                 <div className="space-y-6">
                     
-                    {/* Name */}
-                  <div className="flex items-center p-4 bg-gray-100 rounded-lg"> {/* Changed color to gray-100 */}
-                        <Utensils className="w-6 h-6 text-gray-500 mr-4 flex-shrink-0" /> {/* Changed icon color */}
+                  <div className="flex items-center p-4 bg-gray-100 rounded-lg"> 
+                        <Utensils className="w-6 h-6 text-gray-500 mr-4 flex-shrink-0" /> 
                         <div className="flex-grow">
                             <label htmlFor="nameInput" className="text-sm font-bold text-gray-700 block">Restaurant Name</label>
                             <p className="w-full text-lg font-semibold text-gray-900 py-1"> 
-                                {nameInput} {/* Display name as static text */}
+                                {nameInput}
                             </p>
                         </div>
                     </div>
 
-                    {/* Phone */}
                    <div className={`flex items-start p-4 rounded-lg shadow-inner transition duration-300 ${isPhoneEditing ? 'bg-orange-100 border border-orange-300' : 'bg-gray-50'}`}>
                         <Phone className={`w-6 h-6 mr-4 flex-shrink-0 transition ${isPhoneEditing ? 'text-orange-600' : 'text-gray-500'}`} />
                         <div className="flex-grow">
@@ -555,7 +509,6 @@ if (!restaurantDocId) {
                             )}
                         </div>
                         
-                        {/* EDIT TOGGLE ICON */}
                         <button
                             onClick={() => setIsPhoneEditing(!isPhoneEditing)}
                             className="flex-shrink-0 ml-4 p-1 rounded-full hover:bg-orange-200 transition"
@@ -565,7 +518,6 @@ if (!restaurantDocId) {
                         </button>
                     </div>
                     
-                    {/* Email (Read-only from User Context) */}
                     <div className="flex items-center p-4 bg-gray-100 rounded-lg">
                         <Mail className="w-6 h-6 text-gray-500 mr-4 flex-shrink-0" />
                         <div className="flex-grow">
@@ -575,7 +527,6 @@ if (!restaurantDocId) {
                     </div>
                 </div>
 
-                {/* Operating Hours Section */}
                 <div className="mt-10 border border-gray-200 rounded-xl p-6 shadow-lg">
                     <div 
                         className="flex justify-between items-center cursor-pointer"
@@ -612,27 +563,23 @@ if (!restaurantDocId) {
                         Restaurant Address(es)
                     </h2>
 
-                    {/* Display Existing/Editable Addresses */}
                     <div className="space-y-4 pt-2">
                         {addresses.map((addr, index) => (
                             <div 
                                 key={addr.id || `new-${index}`} 
                                 className="p-3 border border-gray-200 bg-white rounded-lg shadow-sm"
                             >
-                                {/* Input and Coordinates Row */}
                                 <div className="flex gap-2 mb-2 items-center">
 <input
     type="text"
     placeholder="Enter full address"
     value={addr.address}
     onChange={(e) => {
-        // Just update text for typing speed
         const updated = [...addresses];
         updated[index].address = e.target.value;
         setAddresses(updated);
     }}
     onBlur={async (e) => {
-        // Geocode ONLY when user clicks away from the field
         const result = await geocodeAddress(e.target.value);
         if (result) {
             const updated = [...addresses];
@@ -648,7 +595,6 @@ if (!restaurantDocId) {
                                     </span>
                                 </div>
                                 
-                                {/* Controls Row (Availability and Delete) */}
                                 <div className="flex justify-between items-center">
                                     <label className="flex items-center text-sm font-medium text-gray-700">
                                         <input
@@ -672,10 +618,9 @@ if (!restaurantDocId) {
                         ))}
                     </div>
 
-                    {/* Add New Address Button (to add a new empty field) */}
                   <div className="mt-6 pt-4 border-t border-gray-100">
     <button
-        type="button"  // <-- ADD THIS LINE
+        type="button" 
         onClick={addNewAddressField}
         className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg hover:bg-gray-300 transition"
         title="Add Another Address Field"
@@ -684,14 +629,7 @@ if (!restaurantDocId) {
         Add Another Address Field
     </button>
 </div>
-                    {/* Original "Add/Validate" block for temporary validation (optional to keep) */}
-                    {/* The Java logic suggests validation happens on text change, but keeping this block 
-                        allows for dedicated map preview if needed. Removed for brevity, but you can
-                        re-add the validation message, map placeholder, and dedicated "Add Validated Address"
-                        if you prefer that flow over the Java flow. */}
-
                 </div>
-                {/* Save Button */}
                 <button
                     onClick={handleSave}
                     disabled={isSaving}

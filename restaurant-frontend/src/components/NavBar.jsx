@@ -1,19 +1,16 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Utensils, ClipboardList, User } from 'lucide-react'; // Added User icon
-
+import { Utensils, ClipboardList, User } from 'lucide-react'; 
 export default function NavBar() {
   const location = useLocation();
 
   const navItems = [
     { name: 'Menu Management', path: '/restaurant-dashboard', icon: Utensils },
     { name: 'Order Management', path: '/orders', icon: ClipboardList },
-    { name: 'Profile', path: '/profile', icon: User }, // Added Profile Link
+    { name: 'Profile', path: '/profile', icon: User }, 
   ];
 
-  // Utility to determine if a path is active (handles dashboard vs. root redirect)
   const getActivePath = (currentPath) => {
-    // Treat the dashboard as the root for restaurant navigation
     if (currentPath === '/') return '/restaurant-dashboard';
     return currentPath;
   };
@@ -31,7 +28,6 @@ export default function NavBar() {
             {navItems.map((item) => (
               <Link
                 key={item.name}
-                // Check if the current route starts with the item's path for active state
                 to={item.path}
                 className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   (item.path === '/restaurant-dashboard' && currentPath === item.path) || currentPath.startsWith(item.path)

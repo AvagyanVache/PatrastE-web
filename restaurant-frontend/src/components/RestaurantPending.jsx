@@ -1,4 +1,3 @@
-// src/components/RestaurantPending.jsx
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { doc, onSnapshot } from 'firebase/firestore'
@@ -6,12 +5,11 @@ import { db, auth } from '../firebase'
 import { CheckCircle, Clock, AlertCircle , RefreshCw} from 'lucide-react'
 
 export default function RestaurantPending() {
-  const [status, setStatus] = useState('pending') // 'pending', 'approved', 'rejected'
+  const [status, setStatus] = useState('pending') 
   const [restaurantData, setRestaurantData] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Get restaurantId from navigation state or localStorage
   const restaurantId = location.state?.restaurantId || 
     JSON.parse(localStorage.getItem('pendingRestaurant') || '{}').restaurantId
 
@@ -23,8 +21,6 @@ export default function RestaurantPending() {
     }
 
     console.log('Setting up listener for restaurant:', restaurantId)
-
-    // Setup real-time listener (matches Android setupApprovalListener)
     const restaurantRef = doc(db, "FoodPlaces", restaurantId)
     
     const unsubscribe = onSnapshot(
@@ -43,7 +39,6 @@ export default function RestaurantPending() {
             console.log('Restaurant approved! Redirecting...')
             setStatus('approved')
             
-            // Wait 2 seconds to show success message, then navigate
             setTimeout(() => {
               localStorage.removeItem('pendingRestaurant')
               
@@ -71,7 +66,6 @@ export default function RestaurantPending() {
       }
     )
 
-    // Cleanup listener on unmount
     return () => {
       console.log('Cleaning up listener')
       unsubscribe()
@@ -88,7 +82,6 @@ export default function RestaurantPending() {
     <div className="min-h-screen bg-gradient-to-br from-orange-600 to-orange-400 flex items-center justify-center p-4">
       <div className="max-w-lg w-full bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8">
         
-        {/* Pending Status */}
         {status === 'pending' && (
           <div className="text-center space-y-6">
             <div className="flex justify-center">
@@ -153,7 +146,6 @@ export default function RestaurantPending() {
           </div>
         )}
 
-        {/* Approved Status */}
         {status === 'approved' && (
           <div className="text-center space-y-6">
             <div className="flex justify-center">
@@ -175,7 +167,6 @@ export default function RestaurantPending() {
           </div>
         )}
 
-        {/* Rejected Status */}
         {status === 'rejected' && (
           <div className="text-center space-y-6">
             <div className="flex justify-center">
@@ -205,7 +196,6 @@ export default function RestaurantPending() {
           </div>
         )}
 
-        {/* Error Status */}
         {status === 'error' && (
           <div className="text-center space-y-6">
             <div className="flex justify-center">

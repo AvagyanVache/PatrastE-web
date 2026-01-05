@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import AuthBackground from './AuthBackground'
 import { useNavigate } from 'react-router-dom'
-// Import your firebase config
 import { auth } from '../../firebase' 
 import { 
   createUserWithEmailAndPassword, 
@@ -20,7 +19,6 @@ export default function SignupStep1() {
   const [isVerifying, setIsVerifying] = useState(false)
   const navigate = useNavigate()
 
-  // Validation Logic (Matches Java validateInput)
   const validate = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!email || !emailRegex.test(email)) {
@@ -45,16 +43,13 @@ export default function SignupStep1() {
     if (!validate()) return
 
     try {
-      // 1. Create User (Matches signUpUser in Java)
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
 
-      // 2. Send Verification Email
       await sendEmailVerification(user)
       setIsVerifying(true)
       alert("Verification email sent! Please verify your email.")
 
-      // 3. Start Polling (Matches checkEmailVerification in Java)
       const interval = setInterval(async () => {
         await user.reload()
         if (user.emailVerified) {
@@ -66,7 +61,7 @@ export default function SignupStep1() {
           }))
           navigate('/signup-step2')
         }
-      }, 3000) // 3 seconds interval like Java
+      }, 3000) 
 
     } catch (err) {
       setError("Sign-up failed: " + err.message)

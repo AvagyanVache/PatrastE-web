@@ -1,4 +1,3 @@
-// src/components/auth/SignupStep2.jsx
 import { useState } from 'react'
 import { ArrowLeft, Upload, MapPin, X } from 'lucide-react'
 import AuthBackground from './AuthBackground'
@@ -12,7 +11,6 @@ export default function SignupStep2() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  // Form fields
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [category, setCategory] = useState('Restaurant/Cafe')
@@ -45,7 +43,6 @@ export default function SignupStep2() {
       return
     }
 
-    // Simple geocoding using Nominatim (free alternative to Google Geocoding)
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressInput)}`
@@ -76,7 +73,6 @@ export default function SignupStep2() {
   const handleSignup = async (e) => {
     e.preventDefault()
     
-    // Validation
     if (!name.trim()) {
       alert('Restaurant name is required')
       return
@@ -96,7 +92,6 @@ export default function SignupStep2() {
 
     setLoading(true)
 
-    // Get the current authenticated user (created in Step 1)
     const user = auth.currentUser
     
     if (!user) {
@@ -107,7 +102,6 @@ export default function SignupStep2() {
     }
 
     try {
-      // 1. Check if restaurant name was previously deleted
       const deletedDoc = await getDoc(doc(db, "System", "DeletedRestaurants"))
       if (deletedDoc.exists()) {
         const deletedNames = deletedDoc.data().deletedRestaurantNames || []
@@ -118,7 +112,6 @@ export default function SignupStep2() {
         }
       }
 
-      // 2. Check if restaurant name already exists
       const existingRestaurant = await getDoc(doc(db, "FoodPlaces", name))
       if (existingRestaurant.exists()) {
         alert('A restaurant with this name already exists.')
@@ -126,7 +119,6 @@ export default function SignupStep2() {
         return
       }
 
-      // 3. Upload logo if provided
       let logoUrl = null
       try {
         if (logoFile) {
@@ -136,18 +128,16 @@ export default function SignupStep2() {
           logoUrl = await getDownloadURL(logoRef)
         }
 
-        // 4. Create users document (matches Android structure)
         await setDoc(doc(db, "users", user.uid), {
           name: name,
           email: user.email,
           role: "restaurant",
-          restaurantId: name,  // Important: link user → FoodPlaces using restaurant name
+          restaurantId: name,  
           phoneNumber: phone,
           profilePictureUrl: logoUrl || "",
           createdAt: new Date()
         })
 
-        // 5. Create FoodPlaces document using restaurant name as ID (matches Android)
         const restaurantData = {
           name: name,
           email: user.email,
@@ -168,7 +158,6 @@ export default function SignupStep2() {
 
         await setDoc(doc(db, "FoodPlaces", name), restaurantData)
 
-        // 6. Add addresses as subcollection (matches Android structure)
         for (const address of addresses) {
           await addDoc(collection(db, "FoodPlaces", name, "Addresses"), {
             address: address.address,
@@ -178,7 +167,6 @@ export default function SignupStep2() {
           })
         }
 
-        // 7. Setup approval listener (simplified - you'd implement full logic in a separate component)
         localStorage.setItem('pendingRestaurant', JSON.stringify({
           restaurantId: name,
           uid: user.uid
@@ -188,12 +176,9 @@ setupApprovalListener(name, apiLink)
         localStorage.removeItem('signupTemp')
         alert("Restaurant profile created! Your restaurant is pending approval.")
         
-        // Navigate to pending approval page
         navigate('/restaurant-pending', { state: { restaurantId: name } })
         
       } catch (firestoreError) {
-        // If anything fails, we could optionally delete the auth user here
-        // but since verification already happened, it's better to just show error
         console.error('Firestore/Storage error:', firestoreError)
         alert("Error creating restaurant profile: " + firestoreError.message)
         setLoading(false)
@@ -209,7 +194,6 @@ setupApprovalListener(name, apiLink)
   }
 const fetchMenuFromApiAndSave = async (restaurantName, apiLink) => {
   try {
-    // Check if menu already exists
     const menuItemsRef = collection(db, "FoodPlaces", restaurantName, "Menu", "DefaultMenu", "Items")
     const existingItemsSnapshot = await getDocs(query(menuItemsRef, limit(1)))
     
@@ -218,7 +202,6 @@ const fetchMenuFromApiAndSave = async (restaurantName, apiLink) => {
       return
     }
 
-    // Fetch menu from API
     console.log("Fetching menu from:", apiLink)
     const response = await fetch(apiLink)
     
@@ -228,7 +211,6 @@ const fetchMenuFromApiAndSave = async (restaurantName, apiLink) => {
     
     const data = await response.json()
     
-    // Handle JSONBin.io response structure (data is wrapped in 'record' object)
     let menuItems = data
     if (data.record) {
       menuItems = data.record
@@ -243,7 +225,6 @@ const fetchMenuFromApiAndSave = async (restaurantName, apiLink) => {
 
     console.log(`Processing ${menuItems.length} menu items...`)
 
-    // Process each menu item
     const uploadPromises = menuItems.map(async (item) => {
       let itemName = item.name?.trim() || `Item_${Math.random().toString(36).substr(2, 9)}`
       const sanitizedItemName = itemName.replace(/[^a-zA-Z0-9]/g, '_')
@@ -257,7 +238,6 @@ const fetchMenuFromApiAndSave = async (restaurantName, apiLink) => {
         "Item Img": ""
       }
 
-      // Upload image if URL is valid
       if (item.image && item.image.startsWith('http')) {
         try {
           console.log(`Uploading image for ${itemName}...`)
@@ -274,7 +254,6 @@ const fetchMenuFromApiAndSave = async (restaurantName, apiLink) => {
         }
       }
 
-      // Save to Firestore
       const itemRef = doc(db, "FoodPlaces", restaurantName, "Menu", "DefaultMenu", "Items", sanitizedItemName)
       await setDoc(itemRef, itemData)
       console.log(`Saved menu item: ${itemName}`)
@@ -300,8 +279,7 @@ const setupApprovalListener = (restaurantName, apiLink) => {
       
       if (isApproved) {
         console.log(`Restaurant ${restaurantName} approved`)
-        unsubscribe() // Stop listening
-        
+        unsubscribe() 
         if (apiLink && apiLink.trim()) {
           try {
             await fetchMenuFromApiAndSave(restaurantName, apiLink)
@@ -353,7 +331,6 @@ const setupApprovalListener = (restaurantName, apiLink) => {
             <p className="text-gray-700 mb-6">Complete your restaurant profile</p>
 
             <form onSubmit={handleSignup} className="space-y-5">
-              {/* Restaurant Name */}
               <input 
                 placeholder="Restaurant Name" 
                 required 
@@ -362,7 +339,6 @@ const setupApprovalListener = (restaurantName, apiLink) => {
                 className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
               />
 
-              {/* Contact Phone */}
               <input 
                 placeholder="Enter Contact Phone" 
                 required 
@@ -372,7 +348,6 @@ const setupApprovalListener = (restaurantName, apiLink) => {
                 className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
               />
               
-              {/* Category Dropdown */}
               <select 
                 required 
                 value={category}
@@ -384,7 +359,6 @@ const setupApprovalListener = (restaurantName, apiLink) => {
                 ))}
               </select>
 
-              {/* Logo Upload */}
               <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-orange-500 transition">
                 <input 
                   type="file" 
@@ -405,15 +379,12 @@ const setupApprovalListener = (restaurantName, apiLink) => {
                 </label>
               </div>
 
-              {/* API Link */}
               <input 
                 placeholder="API Link (Optional)" 
                 value={apiLink}
                 onChange={(e) => setApiLink(e.target.value)} 
                 className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
               />
-
-              {/* Address Input */}
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <input 
@@ -432,7 +403,6 @@ const setupApprovalListener = (restaurantName, apiLink) => {
                   </button>
                 </div>
 
-                {/* Address List */}
                 {addresses.length > 0 && (
                   <div className="space-y-2 bg-gray-50 p-4 rounded-xl">
                     <p className="font-semibold text-sm text-gray-700">Added Addresses:</p>
@@ -455,7 +425,6 @@ const setupApprovalListener = (restaurantName, apiLink) => {
                 )}
               </div>
 
-              {/* Submit Button */}
               <button 
                 type="submit" 
                 disabled={loading} 

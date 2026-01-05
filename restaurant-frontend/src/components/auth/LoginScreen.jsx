@@ -1,4 +1,3 @@
-// src/components/auth/LoginScreen.jsx
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { auth } from '../../firebase';
@@ -19,7 +18,6 @@ export default function LoginScreen() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // AuthContext will handle redirect based on role
     } catch (error) {
       alert("Login failed: " + error.message);
     } finally {

@@ -1,4 +1,3 @@
-// src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from 'react'
 import { auth, db } from '../firebase'
 import { onAuthStateChanged,signOut } from 'firebase/auth'
@@ -17,12 +16,11 @@ export function AuthProvider({ children }) {
 const logout = async () => {
     try {
       await signOut(auth);
-      // Navigate to the home page or login page after successful sign out
       navigate("/", { replace: true }); 
       console.log("User signed out and redirected.");
     } catch (error) {
       console.error("Error during sign out:", error);
-      throw error; // Re-throw the error for the component to handle if needed
+      throw error;
     }
   };
   useEffect(() => {
@@ -32,35 +30,25 @@ const logout = async () => {
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
           
           if (userDoc.exists()) {
-            // Start with base user data
             let userData = { uid: firebaseUser.uid, ...userDoc.data() };
 
-            // 1. FETCH AND MERGE: Get restaurant approval status
             if (userData.role === "restaurant" && userData.restaurantId) {
               
-              // Use the restaurantId from the user document, fallback to uid if necessary
               const restaurantIdToUse = userData.restaurantId || firebaseUser.uid; 
               const foodPlaceDoc = await getDoc(doc(db, "FoodPlaces", restaurantIdToUse));
               
-              // CRITICAL: Attach isApproved status to the user object
               if (foodPlaceDoc.exists()) {
-                // Ensure the status is attached, defaulting to false if the field is missing
                 userData.isApproved = foodPlaceDoc.data().isApproved === true;
               } else {
-                // If the FoodPlace document doesn't exist, they are definitely not approved
                 userData.isApproved = false;
               }
             }
 
-            // 2. SET STATE: Update the global user state with the merged data
-            // This makes `user.isApproved` available in ProtectedRoute
             setUser(userData); 
 
-            // 3. REDIRECTION LOGIC: Only execute when coming from login/signup
             const path = window.location.pathname;
             if (path.includes('/login') || path.includes('/signup')) {
               if (userData.role === "restaurant") {
-                // Now check the 'isApproved' status attached to the userData object
                 if (userData.isApproved) {
                   navigate("/restaurant-dashboard", { replace: true });
                 } else {

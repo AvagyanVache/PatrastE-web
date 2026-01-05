@@ -1,4 +1,3 @@
-// src/components/auth/AuthBackground.jsx
 export default function AuthBackground({ children }) {
   return (
     <div 
