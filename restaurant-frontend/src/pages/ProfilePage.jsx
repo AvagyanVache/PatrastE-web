@@ -464,9 +464,21 @@ if (!restaurantDocId) {
     
     // --- Render Component ---
 
-    return (
-        <div className="min-h-screen bg-gray-50 pt-16 pb-12">
-            <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-2xl border border-gray-100">
+   return (
+    <div className="relative min-h-screen pt-16 pb-12 overflow-hidden">
+
+        {/* BACKGROUND IMAGE */}
+        <div
+            className="absolute inset-0 opacity-100 -z-10"
+            style={{
+                backgroundImage: "url(/background4.jpg)",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+            }}
+        />
+        {/* CONTENT */}
+        <div className="max-w-4xl mx-auto p-6 bg-white/95 rounded-xl shadow-2xl border border-gray-100 relative z-10">
+
                 <div className="flex justify-end mb-6">
                     <button 
                         onClick={logout}
