@@ -146,69 +146,82 @@ useEffect(() => {
     Swal.fire('Error', `Failed to accept order. Check console for details.`, 'error');
   }
 };
-
-  const declineOrder = async (orderId) => {
-    const { value: reason } = await Swal.fire({
-      title: 'Select Reason for Declining Order',
-      input: 'select',
-      inputOptions: {
-        'Out of stock': 'Out of stock',
-        'Kitchen overload': 'Kitchen overload',
-        'Order not feasible': 'Order not feasible',
-        'Other': 'Other (Specify)'
-      },
-      inputPlaceholder: 'Select a reason',
+const declineOrder = async (orderId) => {
+    const { value: formValues } = await Swal.fire({
+      title: 'Select Reason for Declining',
+      html: `
+        <select id="swal-select" class="swal2-select" style="display: flex; width: 100%;">
+          <option value="" disabled selected>Select a reason</option>
+          <option value="Out of stock">Out of stock</option>
+          <option value="Kitchen overload">Kitchen overload</option>
+          <option value="Order not feasible">Order not feasible</option>
+          <option value="Other">Other (Specify)</option>
+        </select>
+        <textarea id="swal-input-text" class="swal2-textarea" placeholder="Specify your reason here..." style="display: none;"></textarea>
+      `,
+      focusConfirm: false,
       showCancelButton: true,
-      inputValidator: (value) => {
-        if (!value) {
-          return 'You need to select a reason!';
+      confirmButtonText: 'Submit Decline',
+      confirmButtonColor: '#ea580c',
+      cancelButtonColor: '#6b7280',
+      didOpen: () => {
+        const select = Swal.getPopup().querySelector('#swal-select');
+        const textarea = Swal.getPopup().querySelector('#swal-input-text');
+        
+        // Show textarea only when "Other" is selected
+        select.onchange = () => {
+          if (select.value === 'Other') {
+            textarea.style.display = 'flex';
+          } else {
+            textarea.style.display = 'none';
+          }
+        };
+      },
+      preConfirm: () => {
+        const selectValue = document.getElementById('swal-select').value;
+        const textValue = document.getElementById('swal-input-text').value;
+
+        if (!selectValue) {
+          Swal.showValidationMessage('Please select a reason');
+          return false;
         }
+        if (selectValue === 'Other' && !textValue) {
+          Swal.showValidationMessage('Please specify the "Other" reason');
+          return false;
+        }
+        
+        return selectValue === 'Other' ? textValue : selectValue;
       }
     });
 
-    if (reason) {
-      let finalReason = reason;
-
-      if (reason === 'Other') {
-        const { value: customReason } = await Swal.fire({
-          title: 'Specify Decline Reason',
-          input: 'text',
-          inputPlaceholder: 'Enter reason for decline',
-          showCancelButton: true,
-          inputValidator: (value) => {
-            if (!value) {
-              return 'You need to enter a reason!';
-            }
-          }
-        });
-
-        if (customReason) {
-          finalReason = customReason;
-        } else {
-          return;
-        }
-      }
-
+    if (formValues) {
+      const finalReason = formValues;
       const orderDocRef = doc(db, "orders", orderId);
+      
       try {
         await updateDoc(orderDocRef, {
           approvalStatus: "declined",
           declineReason: finalReason,
         });
 
+        Swal.fire({
+          title: 'Order Declined',
+          text: `Reason: ${finalReason}`,
+          icon: 'info',
+          confirmButtonColor: '#ea580c',
+          timer: 2000
+        });
+
+        // Delay deletion so user/system can process the status change
         setTimeout(async () => {
           try {
             await deleteDoc(orderDocRef);
-            Swal.fire('Declined!', 'Order declined and removed.', 'info');
           } catch (e) {
-            console.error("Failed to delete order:", e);
-            Swal.fire('Error', `Failed to delete order: ${e.message}`, 'error');
+            console.error("Cleanup error:", e);
           }
         }, 2000);
-
       } catch (e) {
-        console.error("Failed to decline order:", e);
-        Swal.fire('Error', `Failed to decline order: ${e.message}`, 'error');
+        Swal.fire('Error', e.message, 'error');
       }
     }
   };
@@ -230,18 +243,21 @@ useEffect(() => {
         }
     }
     
-    if (order.restaurantId) {
-        try {
-            const resDoc = await getDoc(doc(db, "FoodPlaces", order.restaurantId));
-            if (resDoc.exists()) {
-                const resData = resDoc.data();
-                order.restaurantName = resData.name || "N/A";
-                order.restaurantAddress = resData.address || "Location Not Set";
-            }
-        } catch (e) {
-            console.error("Error fetching restaurant details:", e);
+    order.restaurantAddress = order.selectedAddress || "Location Not Available";
+
+if (order.restaurantId) {
+    try {
+        const resDoc = await getDoc(doc(db, "FoodPlaces", order.restaurantId));
+        if (resDoc.exists()) {
+            const resData = resDoc.data();
+            order.restaurantName = resData.name || "N/A";
         }
+    } catch (e) {
+        console.error("Error fetching restaurant details:", e);
     }
+}
+
+
     
     return order;
 };
@@ -396,14 +412,14 @@ setOrderHistory(historicalOrders);
                   <p className="text-gray-600">You're all caught up!</p>
                 </div>
               ) : (
-                filteredCurrentOrders.map((order) => (
-                  <OrderItem 
-                    key={order.id} 
-                    order={order} 
-                    onAccept={acceptOrder} 
-                    onDecline={declineOrder} 
-                  />
-                ))
+             filteredCurrentOrders.map((order) => (
+              <OrderItem 
+                key={order.id} 
+                order={order} 
+                onAccept={order.approvalStatus === 'pendingApproval' ? acceptOrder : null} 
+                onDecline={declineOrder} 
+              />
+            ))
               )}
             </div>
         )}
@@ -433,5 +449,5 @@ setOrderHistory(historicalOrders);
         )}
       </div>
     </div>
-  );
+    );
 }
